@@ -11,32 +11,51 @@ using System.Threading.Tasks;
 
 namespace MotionGestureCapture
 {
-    class CamCapture : IDisposable
+    /// <summary>
+    /// CamCapture provide several functions for displaying and capturing image data
+    /// </summary>
+    public class CamCapture : IDisposable
     {
-        private bool m_running;
-        private Capture m_cap;
-        private Filter m_filter;
+        #region Member variables and Getters and Setters
+        private static CamCapture m_instance; 
+        private bool m_running; /* is the cam capturing */
+        private Capture m_cap; /* DirectX Capture */
+        private Filter m_filter; /* this determines which device to use */
 
-        public void Dispose()
-        {
-            m_cap.Dispose();
-            m_filter = null;
-            GC.SuppressFinalize(this);
-        }
-
+        /// <summary>
+        /// A static means of getting the capture devices
+        /// </summary>
         static public DsDevice[] CapDev
         {   get {
                 return DsDevice.GetDevicesOfCat( DirectShowLib.FilterCategory.VideoInputDevice );
             }
         }
 
+        /// <summary>
+        /// Getter for running status
+        /// </summary
+        public bool Running { get { return m_running; } }
+
+        /// <summary>
+        /// Setter for displaying
+        /// </summary>
         public System.Windows.Forms.Control CaptureWindow
         {   set {
                 m_cap.PreviewWindow = value;
             }
         }
 
-        public bool Running { get { return m_running; } }
+        /// <summary>
+        /// This is used to reset the filter on the capture object
+        /// </summary>
+        public String Filter
+        {   set {
+                 if (m_filter != null)
+                     m_filter = null;
+                 m_filter = new Filter(value);
+            }   
+        }
+        #endregion
 
         /// <summary>
         /// Initialize a CamCapture object
@@ -44,11 +63,9 @@ namespace MotionGestureCapture
         /// <param name="p_devMonStr">Device Moniker String</param>
         public CamCapture(string p_devMonStr = null)
         {
-            //TODO: if there are no devices fail gracefully 
-            //If the moniker string is "" then grab the first device
-            if (p_devMonStr == null && CapDev.Length > 0)
-                p_devMonStr = CapDev[0].DevicePath;
-            try
+            if (p_devMonStr != null)
+            {
+                try
                 {
                     m_filter = new Filter(p_devMonStr);
                     m_running = false;
@@ -58,8 +75,30 @@ namespace MotionGestureCapture
                     Dispose();
                     throw;
                 }
+            }
+            else if (CapDev.Length > 0)
+            {
+                m_filter = null;
+                m_running = false;
+            }
+            else
+                throw new Exception("No Capture Devices");
         }
 
+        /// <summary>
+        /// Cleanup
+        /// </summary>
+        public void Dispose()
+        {
+            if (m_cap != null)
+                m_cap.Dispose();
+            m_filter = null;
+            GC.SuppressFinalize(this);
+        }
+
+        /// <summary>
+        /// Capture using the filter set
+        /// </summary>
         public void start()
         {
             if (!m_running)
@@ -69,6 +108,9 @@ namespace MotionGestureCapture
             }
         }
 
+        /// <summary>
+        /// Stops the capture
+        /// </summary>
         public void stop()
         {
             if (m_running)
@@ -77,7 +119,5 @@ namespace MotionGestureCapture
                 m_cap.Dispose();
             }
         }
-
-
     }
 }

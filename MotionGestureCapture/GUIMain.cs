@@ -6,7 +6,7 @@ using System.Windows.Forms;
 
 namespace MotionGestureCapture
 {
-    static class MainGuiTools
+    static class GUIMain
     {
         /// <summary>
         /// The main entry point for the application.

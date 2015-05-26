@@ -54,13 +54,14 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="CamCapture.cs" />
+    <Compile Include="Gesture.cs" />
     <Compile Include="MainGUI.cs">
       <SubType>Form</SubType>
     </Compile>
     <Compile Include="MainGUI.Designer.cs">
       <DependentUpon>MainGUI.cs</DependentUpon>
     </Compile>
-    <Compile Include="MainGuiTools.cs" />
+    <Compile Include="GUIMain.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <EmbeddedResource Include="MainGUI.resx">
       <DependentUpon>MainGUI.cs</DependentUpon>

@@ -1,26 +1,30 @@
 ﻿
+using DirectShowLib;
 using DirectX.Capture;
 using DShowNET;
-using DirectShowLib;
 using System;
 using System.Collections.Generic;
+using System.Drawing;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-
 
 namespace MotionGestureCapture
 {
     /// <summary>
     /// CamCapture provide several functions for displaying and capturing image data
+    /// CamCapture is a singleton class so that all classes are working with the same 
+    /// set of data.
     /// </summary>
     public class CamCapture : IDisposable
     {
         #region Member variables and Getters and Setters
-        private static CamCapture m_instance; 
+        private static CamCapture m_instance; /* Singleton Instance */ 
         private bool m_running; /* is the cam capturing */
         private Capture m_cap; /* DirectX Capture */
         private Filter m_filter; /* this determines which device to use */
+        private Image m_image; /* this is a single image grabbed from a pictureBox*/
+        
 
         /// <summary>
         /// A static means of getting the capture devices
@@ -42,6 +46,7 @@ namespace MotionGestureCapture
         public System.Windows.Forms.Control CaptureWindow
         {   set {
                 m_cap.PreviewWindow = value;
+                m_cap.RenderPreview();
             }
         }
 
@@ -55,13 +60,19 @@ namespace MotionGestureCapture
                  m_filter = new Filter(value);
             }   
         }
+
+        public Image Image
+        {
+            get { return m_image; }
+            //set { m_image = value;  }
+        }
         #endregion
 
         /// <summary>
         /// Initialize a CamCapture object
         /// </summary>
         /// <param name="p_devMonStr">Device Moniker String</param>
-        public CamCapture(string p_devMonStr = null)
+        private CamCapture(string p_devMonStr = null)
         {
             if (p_devMonStr != null)
             {
@@ -86,6 +97,20 @@ namespace MotionGestureCapture
         }
 
         /// <summary>
+        /// Singleton instantiation
+        /// </summary>
+        /// <returns>A running instance if one exists or create a blank one</returns>
+        public static CamCapture getInstance()
+        {
+            if (m_instance == null)
+            {
+                m_instance = new CamCapture();
+            }
+
+            return m_instance;
+        }
+
+        /// <summary>
         /// Cleanup
         /// </summary>
         public void Dispose()
@@ -105,6 +130,7 @@ namespace MotionGestureCapture
             {
                 m_running = true;
                 m_cap = new Capture(m_filter, null);
+                
             }
         }
 
@@ -117,7 +143,28 @@ namespace MotionGestureCapture
             {
                 m_running = false;
                 m_cap.Dispose();
+                
             }
         }
+
+        public Task<Image> grabImage()
+        {
+            TaskCompletionSource<Image> tcs = new TaskCompletionSource<Image>();
+
+            Capture.FrameCapHandler handler = null;
+            handler = (frame) =>
+            {
+                m_cap.FrameCaptureComplete -= handler;
+                tcs.SetResult(frame.Image);
+                m_image = frame.Image;
+            };
+
+            m_cap.FrameCaptureComplete += handler;
+            m_cap.CaptureFrame();
+
+            return tcs.Task;
+        }
+
+        
     }
 }

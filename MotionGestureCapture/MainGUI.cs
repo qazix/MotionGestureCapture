@@ -24,7 +24,7 @@ namespace MotionGestureCapture
         {
             InitializeComponent();
 
-            m_camCapture = new CamCapture();
+            m_camCapture = CamCapture.getInstance();
 
             //Set up combo box with devices
             m_capDevBinding = new BindingSource();
@@ -33,6 +33,7 @@ namespace MotionGestureCapture
             comboBox1.ValueMember = "DevicePath"; /* use DevicePath (moniker) for value */
             comboBox1.DataSource = m_capDevBinding.DataSource;
 
+            //I want to have the feed running right when the aplication starts
             m_camCapture.start();
             m_camCapture.CaptureWindow = mainLiveFeed;
         }
@@ -43,23 +44,10 @@ namespace MotionGestureCapture
         /// </summary>
         /// <param name="sender">Object calling this function</param>
         /// <param name="e">event type</param>
-        private void button1_Click(object sender, EventArgs e)
-        {
-/*            if (!m_camCapture.Running)
-            {
-                m_camCapture.start();
-                m_camCapture.CaptureWindow = mainLiveFeed;
-            }
-            else
-            {
-                m_camCapture.stop();
-                m_camCapture.CaptureWindow = null;
-            }*/
-        }
-
-        private void backgroundWorker1_DoWork(object sender, DoWorkEventArgs e)
+        private async void button1_Click(object sender, EventArgs e)
         {
 
+            mainAlteredFeed.Image = await m_camCapture.grabImage();
         }
 
         /// <summary>
@@ -102,6 +90,21 @@ namespace MotionGestureCapture
                 case 1:
                     m_camCapture.CaptureWindow = testingPic;
                     break;
+            }
+        }
+
+        private void capButton_Click(object sender, EventArgs e)
+        {
+            //Handle changing the text
+            if (capButton.Text == "Capture")
+            {
+                capButton.Text = "Resume";
+               
+            }
+            else
+            {
+                capButton.Text = "Capture";
+                m_camCapture.CaptureWindow = testingPic;
             }
         }
     }

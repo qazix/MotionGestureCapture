@@ -77,11 +77,6 @@
             this.groupBox1.SuspendLayout();
             this.SuspendLayout();
             // 
-            // backgroundWorker1
-            // 
-            this.backgroundWorker1.WorkerSupportsCancellation = true;
-            this.backgroundWorker1.DoWork += new System.ComponentModel.DoWorkEventHandler(this.backgroundWorker1_DoWork);
-            // 
             // initButton
             // 
             this.initButton.Location = new System.Drawing.Point(6, 339);
@@ -164,6 +159,7 @@
             this.capButton.TabIndex = 9;
             this.capButton.Text = "Capture";
             this.capButton.UseVisualStyleBackColor = true;
+            this.capButton.Click += new System.EventHandler(this.capButton_Click);
             // 
             // testingPic
             // 

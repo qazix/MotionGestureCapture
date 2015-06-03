@@ -28,7 +28,7 @@ namespace MotionGestureCapture
 
             //Set up combo box with devices
             m_capDevBinding = new BindingSource();
-            m_capDevBinding.DataSource = CamCapture.CapDev;
+            m_capDevBinding.DataSource = OldCamCapture.CapDev;
             comboBox1.DisplayMember = "Name"; /* use Name feild for display */
             comboBox1.ValueMember = "DevicePath"; /* use DevicePath (moniker) for value */
             comboBox1.DataSource = m_capDevBinding.DataSource;
@@ -47,7 +47,7 @@ namespace MotionGestureCapture
         private async void button1_Click(object sender, EventArgs e)
         {
 
-            mainAlteredFeed.Image = await m_camCapture.grabImage();
+           // mainAlteredFeed.Image = await m_camCapture.grabImage();
         }
 
         /// <summary>
@@ -68,6 +68,7 @@ namespace MotionGestureCapture
 
             //Resume the display if it was running at the beginning
             m_camCapture.Filter = (string) comboBox1.SelectedValue;
+            m_camCapture.FilterIndex = comboBox1.SelectedIndex;
             if (tempRunning)
             {
                 m_camCapture.start();
@@ -82,12 +83,15 @@ namespace MotionGestureCapture
         /// <param name="e"></param>
         private void tabControl_SelectedIndexChanged(object sender, EventArgs e)
         {
+            m_camCapture.stop();
             switch (tabControl1.SelectedIndex)
             {
                 case 0:
+                    m_camCapture.start();
                     m_camCapture.CaptureWindow = mainLiveFeed;
                     break;
                 case 1:
+                    m_camCapture.start();
                     m_camCapture.CaptureWindow = testingPic;
                     break;
             }

@@ -47,9 +47,9 @@ namespace MotionGestureCapture
         /// </summary>
         /// <param name="sender">Object calling this function</param>
         /// <param name="e">event type</param>
-        private async void button1_Click(object sender, EventArgs e)
+        private void button1_Click(object sender, EventArgs e)
         {
-            mainAlteredFeed.Image = await m_camCapture.grabImage();
+            mainAlteredFeed.Image = m_camCapture.CapImage; //m_camCapture.grabImage();
         }
 
         /// <summary>

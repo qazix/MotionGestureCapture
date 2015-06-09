@@ -64,7 +64,6 @@
     </Compile>
     <Compile Include="GUIMain.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="StillCapture.cs" />
     <EmbeddedResource Include="MainGUI.resx">
       <DependentUpon>MainGUI.cs</DependentUpon>
     </EmbeddedResource>

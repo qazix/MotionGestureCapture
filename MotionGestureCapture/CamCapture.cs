@@ -23,7 +23,7 @@ namespace MotionGestureCapture
         private IMediaControl m_mediaControl; /* Display element for GUI */
         private IVideoWindow m_videoWindow; /* pictureBox control */
         private static System.Windows.Forms.PictureBox m_picBox = null; /* handl to picturebox */
-        private static Image m_image = null; /* Acting as a globald variable I will fix this */
+        private Image m_image = null; /* Acting as a globald variable I will fix this */
         private const int WMGraphNotify = 13; /* refence number not realy sure why 13 */
         private const string NO_CAP_DEV = "There are no capture devices";
         private const string INVALID_CAP_DEV = "The selected capture device is invalid";
@@ -71,12 +71,6 @@ namespace MotionGestureCapture
                 setupPicBox();
             }
         }
-
-        /// <summary>
-        /// Property access to global variable this will change
-        /// </summary>
-        public Image CapImage { get { return m_image; } }
-
         #endregion
 
         /// <summary>
@@ -108,24 +102,32 @@ namespace MotionGestureCapture
         }
 
         /// <summary>
-        /// 
+        /// Establishes the connection between the graph and the pictureBox
         /// </summary>
         private void setupPicBox()
         {
             int hr;
+            //Get handle to pictureBox
             IntPtr picBoxPtr = m_picBox.Handle;
+
+            //Setup the notification link 
             hr = ((IMediaEventEx)m_graph).SetNotifyWindow(picBoxPtr, WMGraphNotify, IntPtr.Zero);
             DsError.ThrowExceptionForHR(hr);
 
             m_videoWindow.SetWindowPosition(0, 0, m_picBox.Width, m_picBox.Height);
 
+            //Take graph window and set it to be owned by pictureBox
             hr = m_videoWindow.put_Owner(picBoxPtr);
             DsError.ThrowExceptionForHR(hr);
 
+            //Set it as a child
             hr = m_videoWindow.put_WindowStyle(WindowStyle.Child);
             DsError.ThrowExceptionForHR(hr);
         }
 
+        /// <summary>
+        /// Dispose interface information
+        /// </summary>
         private void disposeInterfaces()
         {
             m_graph = null;
@@ -158,13 +160,13 @@ namespace MotionGestureCapture
             DsError.ThrowExceptionForHR(hr);
 
             //Create a sample grabber and add it to the graph
-            m_sampleGrabber = (IBaseFilter)Activator.CreateInstance(typeof(SampleGrabber));
+            m_sampleGrabber = (IBaseFilter)Activator.CreateInstance(typeof(CamSampleGrabber));
             hr = m_graph.AddFilter(m_sampleGrabber, "SampleGrabber");
             DsError.ThrowExceptionForHR(hr);
 
             //Set the callback function for the sample grabber.  It will be CamCaptureGrabberCallBack.bufferCB()
             // this is because sampleCB only support single image getting.
-            hr = ((ISampleGrabber)m_sampleGrabber).SetCallback(new CamCaptureGrabberCallBack(), 1);
+            hr = ((CamSampleGrabber)m_sampleGrabber).SetCallback(new CamCaptureGrabberCallBack(), 1);
             DsError.ThrowExceptionForHR(hr);
             hr = ((ISampleGrabber)m_sampleGrabber).SetOneShot(false);
             DsError.ThrowExceptionForHR(hr);
@@ -183,7 +185,6 @@ namespace MotionGestureCapture
             DsError.ThrowExceptionForHR(hr);
             DsUtils.FreeAMMediaType(media);
             
-
             //Connect capture device to the sample grabber
             hr = m_graph.Connect(capPin, samPin);
             DsError.ThrowExceptionForHR(hr);
@@ -193,8 +194,7 @@ namespace MotionGestureCapture
             // parameters are null.  The 4 and 5 parameter could not be null, however the 4th
             // is an intermediate filter which i don't want and the 5th is the sink if not defined
             // will end up being a default filter.
-            hr = pBuilder.RenderStream(null, null,
-                                       m_sampleGrabber, null, null);
+            hr = pBuilder.RenderStream(null, null, m_sampleGrabber, null, null);
             DsError.ThrowExceptionForHR(hr);
         }
 
@@ -269,6 +269,9 @@ namespace MotionGestureCapture
             return hr;
         }
 
+        /// <summary>
+        /// Start the preview feed
+        /// </summary>
         public void start()
         {
             if (!m_running)
@@ -286,6 +289,9 @@ namespace MotionGestureCapture
             }
         }
 
+        /// <summary>
+        /// Stop the preview feed
+        /// </summary>
         public void stop()
         {
             int hr = 0;
@@ -297,20 +303,16 @@ namespace MotionGestureCapture
             }
         }
 
-        public Image grabImage()
+        /// <summary>
+        /// Method that will be used to grab a single image 
+        /// </summary>
+        /// <returns>Image from Callback</returns>
+        public async Task<Image> grabImage()
         {
-            Image returnImage = null;
-            IntPtr pBuf = IntPtr.Zero;
-            int size = 0;
-            ((ISampleGrabber)m_sampleGrabber).GetCurrentBuffer(size, pBuf);
-            Byte[] buf = new byte[size];
-            Marshal.Copy(pBuf, buf, 0, size);
-            using (MemoryStream ms = new MemoryStream(buf))
-            {
-                returnImage = new Bitmap(ms);
-            }
+            Task<Image> imageTask = ((CamSampleGrabber)m_sampleGrabber).grabImg();
+            m_image = await imageTask;
 
-            return returnImage;
+            return await imageTask;
         }
 
         /// <summary>
@@ -337,44 +339,99 @@ namespace MotionGestureCapture
             return m_instance;
         }
 
+        /// <summary>
+        /// The sample grabber that also handles grabbing stills
+        /// </summary>
+        public class CamSampleGrabber : SampleGrabber
+        {
+            //Handle to the CB class
+            private CamCaptureGrabberCallBack m_callBackHandle = null;
+            
+            /// <summary>
+            /// This is an asynchronous call to grab image
+            /// </summary>
+            /// <returns>The task awaiting the image</returns>
+            public async Task<Image> grabImg()
+            {
+                TaskCompletionSource<Image> tcs = new TaskCompletionSource<Image>();
+                CamCaptureGrabberCallBack.FrameCapHandler handler = null;
+
+                //A lambda function that listens for the FrameCaptureComplete event
+                handler = (frame) =>
+                {
+                    m_callBackHandle.FrameCaptureComplete -= handler;
+                    tcs.SetResult(frame);
+                };
+
+                m_callBackHandle.FrameCaptureComplete += handler;
+                m_callBackHandle.CaptureFrame();
+
+                return await tcs.Task;
+            }
+
+            //Step in to capture the handler then proceed to call the ISampleGrabber.SetCallbcak
+            public int SetCallback(ISampleGrabberCB pCallback, int WhichMethodToCallback)
+            {
+                m_callBackHandle = (CamCaptureGrabberCallBack)pCallback;
+                return (this as ISampleGrabber).SetCallback((ISampleGrabberCB)pCallback, WhichMethodToCallback);
+            }
+        }
+
+        /// <summary>
+        /// CamCapture supports capturing stills and live feed
+        /// </summary>
         class CamCaptureGrabberCallBack : ISampleGrabberCB
         {
-
             public delegate void FrameCapHandler(Image p_image);
             public event FrameCapHandler FrameCaptureComplete;
 
             public bool ToGrabImage { get; set; }
+         
+            //Triggers a FrameCaptureComplete event
             public Image SetBitMap { set { FrameCaptureComplete(value); } }
 
+            //Constructor
             public CamCaptureGrabberCallBack()
             { ToGrabImage = false; }
             
+            /// <summary>
+            /// The callback method that allows continuous capture
+            /// </summary>
+            /// <param name="SampleTime">Time sample was taken</param>
+            /// <param name="pBuffer">The image in buffer form</param>
+            /// <param name="bufferLen">Size of the buffer</param>
+            /// <returns>Error condition</returns>
             public int BufferCB(double SampleTime, IntPtr pBuffer, int bufferLen)
             {
-                //if (ToGrabImage)
-                //{
+                if (ToGrabImage)
+                {
                     if (pBuffer != null && bufferLen > 0)
                     {
                         if (m_picBox != null)
                         {
+                            //Copy the volatile buffer into a marshall controlled buffer
                             byte[] buf = new byte[bufferLen];
                             Marshal.Copy(pBuffer, buf, 0, bufferLen);
                             using (MemoryStream ms = new MemoryStream(buf))
                             {
-                                m_image = new Bitmap(ms);
+                                SetBitMap = new Bitmap(ms);
                             }
                         }
                     }
-                //}
+                    ToGrabImage = false;
+                }
                 return 0; 
             }
 
+            /// <summary>
+            /// unused
+            /// </summary>
             public int SampleCB(double SampleTime, IMediaSample pSample)
-            {
-                
-                return 0;
-            }
+            { return 0; }
 
+            /// <summary>
+            /// Starts the capture frame
+            /// </summary>
             public void CaptureFrame()
             {
                 ToGrabImage = true;

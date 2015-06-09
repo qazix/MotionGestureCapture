@@ -7,6 +7,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MotionGestureCapture", "Mot
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Processing", "Processing\Processing.csproj", "{4D67ACD5-CF0E-47E1-87E4-4A180A14DC55}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MotionGestureGUI", "MotionGestureGUI\MotionGestureGUI.csproj", "{6E5D4307-C1FE-4EB2-992F-3308FFFEB92F}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -21,6 +23,10 @@ Global
 		{4D67ACD5-CF0E-47E1-87E4-4A180A14DC55}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{4D67ACD5-CF0E-47E1-87E4-4A180A14DC55}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{4D67ACD5-CF0E-47E1-87E4-4A180A14DC55}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6E5D4307-C1FE-4EB2-992F-3308FFFEB92F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6E5D4307-C1FE-4EB2-992F-3308FFFEB92F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6E5D4307-C1FE-4EB2-992F-3308FFFEB92F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6E5D4307-C1FE-4EB2-992F-3308FFFEB92F}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

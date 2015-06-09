@@ -12,7 +12,7 @@ using System.Threading.Tasks;
 
 namespace MotionGestureCapture
 {
-    class CamCapture : IDisposable
+    public class CamCapture : IDisposable
     {
         #region Member variables and accessors and mutators
         private static CamCapture m_instance = null; /* Singleton Instance */

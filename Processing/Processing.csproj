@@ -44,6 +44,12 @@
     <Compile Include="Processing.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\MotionGestureCapture\MotionGestureCapture.csproj">
+      <Project>{f132e93a-ccb6-478a-8f52-c898c4332436}</Project>
+      <Name>MotionGestureCapture</Name>
+    </ProjectReference>
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.

@@ -66,9 +66,9 @@
       <Project>{f132e93a-ccb6-478a-8f52-c898c4332436}</Project>
       <Name>MotionGestureCapture</Name>
     </ProjectReference>
-    <ProjectReference Include="..\Processing\Processing.csproj">
+    <ProjectReference Include="..\Processing\MotionGestureProcessing.csproj">
       <Project>{4d67acd5-cf0e-47e1-87e4-4a180a14dc55}</Project>
-      <Name>Processing</Name>
+      <Name>MotionGestureProcessing</Name>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

@@ -309,10 +309,15 @@ namespace MotionGestureCapture
         /// <returns>Image from Callback</returns>
         public async Task<Image> grabImage()
         {
-            Task<Image> imageTask = ((CamSampleGrabber)m_sampleGrabber).grabImg();
-            m_image = await imageTask;
+            if (m_running)
+            {
+                Task<Image> imageTask = ((CamSampleGrabber)m_sampleGrabber).grabImg();
+                m_image = await imageTask;
 
-            return await imageTask;
+                return await imageTask;
+            }
+            else
+                return null;
         }
 
         /// <summary>

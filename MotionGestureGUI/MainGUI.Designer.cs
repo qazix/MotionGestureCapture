@@ -66,6 +66,7 @@
             this.identifiedY = new System.Windows.Forms.TextBox();
             this.identifiedX = new System.Windows.Forms.TextBox();
             this.label13 = new System.Windows.Forms.Label();
+            this.testInit = new System.Windows.Forms.Button();
             ((System.ComponentModel.ISupportInitialize)(this.mainLiveFeed)).BeginInit();
             this.tabControl1.SuspendLayout();
             this.tabPage1.SuspendLayout();
@@ -138,6 +139,7 @@
             // 
             // tabPage2
             // 
+            this.tabPage2.Controls.Add(this.testInit);
             this.tabPage2.Controls.Add(this.capButton);
             this.tabPage2.Controls.Add(this.testingPic);
             this.tabPage2.Controls.Add(this.groupBox3);
@@ -153,7 +155,7 @@
             // 
             // capButton
             // 
-            this.capButton.Location = new System.Drawing.Point(7, 339);
+            this.capButton.Location = new System.Drawing.Point(114, 339);
             this.capButton.Name = "capButton";
             this.capButton.Size = new System.Drawing.Size(101, 37);
             this.capButton.TabIndex = 9;
@@ -435,6 +437,16 @@
             this.label13.TabIndex = 4;
             this.label13.Text = "Capture Device";
             // 
+            // testInit
+            // 
+            this.testInit.Location = new System.Drawing.Point(7, 339);
+            this.testInit.Name = "testInit";
+            this.testInit.Size = new System.Drawing.Size(101, 37);
+            this.testInit.TabIndex = 10;
+            this.testInit.Text = "Initialize";
+            this.testInit.UseVisualStyleBackColor = true;
+            this.testInit.Click += new System.EventHandler(this.testInit_Click);
+            // 
             // MainGUI
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(8F, 16F);
@@ -502,6 +514,7 @@
         private System.Windows.Forms.Label label13;
         private System.Windows.Forms.Button capButton;
         private System.Windows.Forms.PictureBox testingPic;
+        private System.Windows.Forms.Button testInit;
     }
 }
 

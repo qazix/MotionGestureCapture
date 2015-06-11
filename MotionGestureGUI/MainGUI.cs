@@ -7,6 +7,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using MotionGestureProcessing;
 
 namespace MotionGestureCapture
 {
@@ -16,6 +17,7 @@ namespace MotionGestureCapture
         private BindingSource m_capDevBinding; 
         /* Object for handling display and capture */
         private CamCapture m_camCapture;
+        private Processing m_processing;
         
         /// <summary>
         /// Initialize all the components
@@ -34,6 +36,11 @@ namespace MotionGestureCapture
             comboBox1.DataSource = m_capDevBinding.DataSource;
 
             mainAlteredFeed.SizeMode = PictureBoxSizeMode.StretchImage;
+            testingPic.SizeMode = PictureBoxSizeMode.StretchImage;
+
+            //Set up processing
+            m_processing = Processing.getInstance();
+            setupProcessingListener();
 
             //I want to have the feed running right when the aplication starts
             m_camCapture.CaptureWindow = mainLiveFeed;
@@ -42,14 +49,33 @@ namespace MotionGestureCapture
         }
 
         /// <summary>
+        /// Establishes a listening connection 
+        /// </summary>
+        private void setupProcessingListener()
+        {
+            Processing.ImageReadyHandler handler = null;
+
+            //Sets the altered feed to the image if the altered feed is on screen
+            handler = (obj, image) =>
+            {   
+                if (tabControl1.SelectedIndex == 0)
+                    mainAlteredFeed.Image = image;
+                else
+                    testingPic.Image = image;
+            };
+
+            m_processing.ReturnImageFilled += handler;
+        }
+
+        /// <summary>
         /// This currently is for start video cpture but will eventually call
         ///  initialize on the processing component
         /// </summary>
         /// <param name="sender">Object calling this function</param>
         /// <param name="e">event type</param>
-        private async void button1_Click(object sender, EventArgs e)
+        private void button1_Click(object sender, EventArgs e)
         {
-            mainAlteredFeed.Image = await m_camCapture.grabImage();
+            m_processing.initialize(true);
         }
 
         /// <summary>
@@ -85,6 +111,7 @@ namespace MotionGestureCapture
         private void tabControl_SelectedIndexChanged(object sender, EventArgs e)
         {
             m_camCapture.stop();
+            //m_processing.stop();
             switch (tabControl1.SelectedIndex)
             {
                 case 0:
@@ -93,24 +120,49 @@ namespace MotionGestureCapture
                     break;
                 case 1:
                     m_camCapture.CaptureWindow = testingPic;
+                    capButton.Text = "Capture";
                     m_camCapture.start();
                     break;
             }
         }
 
+        /// <summary>
+        /// Initialize for testing purposes
+        /// </summary>
+        private void testInit_Click(object sender, EventArgs e)
+        {
+            m_processing.initialize(false);
+        }
+
+        /// <summary>
+        /// Either captures a single image or resumes capture
+        /// </summary>
         private void capButton_Click(object sender, EventArgs e)
         {
             //Handle changing the text
             if (capButton.Text == "Capture")
             {
                 capButton.Text = "Resume";
-               
+
+                //Add the stop functionality after grabbing an image
+                Processing.ImageReadyHandler handler = null;
+                handler = (obj, image) =>
+                {
+                    m_processing.ReturnImageFilled -= handler;
+                    m_camCapture.stop();
+                };
+
+                m_processing.ReturnImageFilled += handler;
+                
+                m_processing.oneShot();
             }
             else
             {
                 capButton.Text = "Capture";
-                m_camCapture.CaptureWindow = testingPic;
+                m_camCapture.start();
             }
         }
+
+
     }
 }

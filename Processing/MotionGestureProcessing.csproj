@@ -7,7 +7,7 @@
     <ProjectGuid>{4D67ACD5-CF0E-47E1-87E4-4A180A14DC55}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>Processing</RootNamespace>
+    <RootNamespace>MotionGestureProcessing</RootNamespace>
     <AssemblyName>Processing</AssemblyName>
     <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
@@ -41,6 +41,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Gesture.cs" />
+    <Compile Include="HandIsolation.cs" />
     <Compile Include="Processing.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>

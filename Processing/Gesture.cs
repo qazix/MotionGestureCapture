@@ -5,11 +5,12 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Processing
+namespace MotionGestureProcessing
 {
-    class Gesture
+    public class Gesture
     {
-        enum Gestures { NoGesture, RightClick, LeftClick, ClickAndHold, DoubleClick}
-        public delegate void gestureCaptured(Gestures g, Image i);
+        enum Gestures { NoGesture, RightClick, LeftClick, ClickAndHold, DoubleClick };
+
+        //public delegate void gestureCaptured(Gestures g, Image i);
     }
 }

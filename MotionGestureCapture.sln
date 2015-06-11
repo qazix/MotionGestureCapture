@@ -5,7 +5,7 @@ VisualStudioVersion = 12.0.21005.1
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MotionGestureCapture", "MotionGestureCapture\MotionGestureCapture.csproj", "{F132E93A-CCB6-478A-8F52-C898C4332436}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Processing", "Processing\Processing.csproj", "{4D67ACD5-CF0E-47E1-87E4-4A180A14DC55}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MotionGestureProcessing", "Processing\MotionGestureProcessing.csproj", "{4D67ACD5-CF0E-47E1-87E4-4A180A14DC55}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MotionGestureGUI", "MotionGestureGUI\MotionGestureGUI.csproj", "{6E5D4307-C1FE-4EB2-992F-3308FFFEB92F}"
 EndProject

@@ -246,7 +246,9 @@ namespace MotionGestureCapture
                 {
                     //Find the largest image with format of VideoFormat.  There will be two one with Video
                     // and another with VideoFormat2, SammpleGrabber will ony accept VideoFormat
-                    if (v.BmiHeader.ImageSize > curMax && mediaTypes[0].formatType == FormatType.VideoInfo)
+                    // For simplicity down the road i want an RGB24 format
+                    if (v.BmiHeader.ImageSize > curMax && mediaTypes[0].formatType == FormatType.VideoInfo &&
+                        mediaTypes[0].subType == MediaSubType.MJPG)
                     {
                         p_refMedia = mediaTypes[0];
                         curMax = v.BmiHeader.ImageSize;
@@ -408,6 +410,8 @@ namespace MotionGestureCapture
             /// <returns>Error condition</returns>
             public int BufferCB(double SampleTime, IntPtr pBuffer, int bufferLen)
             {
+                //Bitmap temp;
+
                 if (ToGrabImage)
                 {
                     if (pBuffer != null && bufferLen > 0)
@@ -419,12 +423,19 @@ namespace MotionGestureCapture
                             Marshal.Copy(pBuffer, buf, 0, bufferLen);
                             using (MemoryStream ms = new MemoryStream(buf))
                             {
-                                SetBitMap = new Bitmap(ms);
+                                //I would flip every frame but i get a bug in that my preview screen is black
+                                Bitmap temp = new Bitmap(ms);
+                                temp.RotateFlip(RotateFlipType.Rotate180FlipY);
+                                SetBitMap = temp;
+                                //temp.Save(ms, System.Drawing.Imaging.ImageFormat.Jpeg);
+                                //ms.Read(buf, 0, bufferLen);
                             }
-                        }
-                    }
-                    ToGrabImage = false;
+                            //Marshal.Copy(buf, 0, pBuffer, bufferLen);
+                        }                       
+                    }                    
+                    ToGrabImage = false;    
                 }
+
                 return 0; 
             }
 

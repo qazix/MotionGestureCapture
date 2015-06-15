@@ -98,7 +98,6 @@ namespace MotionGestureProcessing
 
         /// <summary>
         /// this method transforms the image into a filtered image
-        /// UPDATE: this now performs almost insantly instead of the 2 seconds it took before
         /// </summary>
         /// <param name="p_image"></param>
         private void doWork(Image p_image)
@@ -167,7 +166,6 @@ namespace MotionGestureProcessing
                         });
                 #endregion
 
-                //Copy it back and fill the image with the modified data
                 Marshal.Copy(buffer, 0, data.Scan0, buffer.Length);
                 ((Bitmap)p_image).UnlockBits(data);
 

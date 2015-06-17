@@ -248,7 +248,7 @@ namespace MotionGestureCapture
                     // and another with VideoFormat2, SammpleGrabber will ony accept VideoFormat
                     // For simplicity down the road i want an RGB24 format
                     if (v.BmiHeader.ImageSize > curMax && mediaTypes[0].formatType == FormatType.VideoInfo &&
-                        mediaTypes[0].subType == MediaSubType.MJPG)
+                        (mediaTypes[0].subType == MediaSubType.MJPG))
                     {
                         p_refMedia = mediaTypes[0];
                         curMax = v.BmiHeader.ImageSize;

@@ -69,7 +69,7 @@ namespace MotionGestureProcessing
                     m_validPixels.Add(color.ToArgb());
                 }
 
-            //expandSelection(p_toInit);
+            expandSelection(p_toInit);
         }
 
         /// <summary>
@@ -137,17 +137,17 @@ namespace MotionGestureProcessing
             Point bottomLeft = new Point((p_image.Width / 2) - 50, (p_image.Height / 2 + 50));
             Point bottomRight = new Point((p_image.Width / 2) + 50, (p_image.Height / 2 + 50));
 
-            Parallel.Invoke(
+            /*Parallel.Invoke(
                 () =>
                 {
                     //going up
                     dividedExpandSelectionRGB(buffer, topLeft, topRight, DIRECTION.Up, data.Width);
                 },
                 () =>
-                {
+                {*/
                     //Right
                     dividedExpandSelectionRGB(buffer, topRight, bottomRight, DIRECTION.Right, data.Width);
-                },
+                /*},
                 () =>
                 {
                     //Down
@@ -157,7 +157,7 @@ namespace MotionGestureProcessing
                 {
                     //Left
                     dividedExpandSelectionRGB(buffer, topLeft, bottomLeft, DIRECTION.Left, data.Width);
-                });
+                });*/
 
             unlockBitmap(ref buffer, ref data, ref p_image);
         }
@@ -198,16 +198,14 @@ namespace MotionGestureProcessing
                     throw new Exception("Inconceivable!!");
             }        
 
-            //Failed attempt at a simple edge detection algorithm.  I will implement something else;
             for (int y = start.Y; y <= end.Y; ++y)
                 for (int x = start.X; x <= end.X; ++x)
                 {
                     curX = x;
                     curY = y;
                     offset = ((y * p_width) + x) * 3;
-                    byte tolerance = (byte) (256 * .05);
+                    int tolerance = (int) (256 * .75) / 2; // Within 25% of the last pixel
 
-                    //initialize the last pixel
                     lastPixel[0] = p_buffer[offset + 0];
                     lastPixel[1] = p_buffer[offset + 1];
                     lastPixel[2] = p_buffer[offset + 2];
@@ -217,10 +215,9 @@ namespace MotionGestureProcessing
                         //Just a basic transform from 1 dimension to 2
                         offset = ((curY * p_width) + curX) * 3;
 
-                        //Check to see if each color is with the tolerance of the last pixel
-                        notEdge = (Math.Max(lastPixel[0], p_buffer[offset + 0]) == lastPixel[0] ? lastPixel[0] - p_buffer[offset + 0] : p_buffer[offset + 0] - lastPixel[0]) < tolerance &&
-                                  (Math.Max(lastPixel[1], p_buffer[offset + 1]) == lastPixel[1] ? lastPixel[1] - p_buffer[offset + 1] : p_buffer[offset + 1] - lastPixel[1]) < tolerance &&
-                                  (Math.Max(lastPixel[2], p_buffer[offset + 2]) == lastPixel[2] ? lastPixel[2] - p_buffer[offset + 2] : p_buffer[offset + 2] - lastPixel[2]) < tolerance;
+                        notEdge = (Math.Max(lastPixel[0], p_buffer[offset + 0]) == lastPixel[0] ? lastPixel[0] - p_buffer[offset + 0] : p_buffer[offset + 0] - lastPixel[0]) < 32 &&
+                                  (Math.Max(lastPixel[1], p_buffer[offset + 1]) == lastPixel[1] ? lastPixel[1] - p_buffer[offset + 1] : p_buffer[offset + 1] - lastPixel[1]) < 32 &&
+                                  (Math.Max(lastPixel[2], p_buffer[offset + 2]) == lastPixel[2] ? lastPixel[2] - p_buffer[offset + 2] : p_buffer[offset + 2] - lastPixel[2]) < 32;
 
                         lastPixel[0] = p_buffer[offset + 0];
                         lastPixel[1] = p_buffer[offset + 1];

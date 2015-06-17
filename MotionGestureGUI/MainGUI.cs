@@ -18,6 +18,7 @@ namespace MotionGestureCapture
         /* Object for handling display and capture */
         private CamCapture m_camCapture;
         private Processing m_processing;
+        private PictureBox m_initSquare;
         
         /// <summary>
         /// Initialize all the components
@@ -46,6 +47,7 @@ namespace MotionGestureCapture
             m_camCapture.CaptureWindow = mainLiveFeed;
             m_camCapture.start();
 
+            setupInitSquare();
         }
 
         /// <summary>
@@ -65,6 +67,43 @@ namespace MotionGestureCapture
             };
 
             m_processing.ReturnImageFilled += handler;
+        }
+
+        /// <summary>
+        /// This is suppose to put a green overlay on th main picture box
+        /// </summary>
+        private void setupInitSquare()
+        {
+            m_initSquare = new PictureBox();
+            m_initSquare.BackColor = Color.Transparent;
+            m_initSquare.Parent = mainLiveFeed;
+            m_initSquare.Size = mainLiveFeed.Size;
+            m_initSquare.Location = mainLiveFeed.Location;
+            
+            //populate Bitmap
+            Bitmap square = new Bitmap(mainLiveFeed.Width, mainLiveFeed.Height);
+
+            int endX = (square.Width / 2) + 50;
+            int endY = (square.Height / 2) + 50;
+            int startX = endX - 100;
+            int startY = endY - 100;
+            for (int y = startY; y <= endY; ++y)
+            {
+                if (y != startY && y != endY)
+                {
+                    square.SetPixel(startX, y, Color.LimeGreen);
+                    square.SetPixel(endX, y, Color.LimeGreen);
+                }
+                else
+                {
+                    for (int x = startX; x <= endX; ++x)
+                        square.SetPixel(x, y, Color.LimeGreen);
+                }
+            }
+            square.Save("TestSquare.bmp");
+
+            //Add bitmap to pictureBox
+            m_initSquare.Image = square;
         }
 
         /// <summary>
@@ -162,7 +201,5 @@ namespace MotionGestureCapture
                 m_camCapture.start();
             }
         }
-
-
     }
 }

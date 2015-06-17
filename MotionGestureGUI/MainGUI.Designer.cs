@@ -34,8 +34,10 @@
             this.comboBox1 = new System.Windows.Forms.ComboBox();
             this.tabControl1 = new System.Windows.Forms.TabControl();
             this.tabPage1 = new System.Windows.Forms.TabPage();
+            this.label14 = new System.Windows.Forms.Label();
             this.mainAlteredFeed = new System.Windows.Forms.PictureBox();
             this.tabPage2 = new System.Windows.Forms.TabPage();
+            this.testInit = new System.Windows.Forms.Button();
             this.capButton = new System.Windows.Forms.Button();
             this.testingPic = new System.Windows.Forms.PictureBox();
             this.groupBox3 = new System.Windows.Forms.GroupBox();
@@ -66,7 +68,8 @@
             this.identifiedY = new System.Windows.Forms.TextBox();
             this.identifiedX = new System.Windows.Forms.TextBox();
             this.label13 = new System.Windows.Forms.Label();
-            this.testInit = new System.Windows.Forms.Button();
+            this.label15 = new System.Windows.Forms.Label();
+            this.label16 = new System.Windows.Forms.Label();
             ((System.ComponentModel.ISupportInitialize)(this.mainLiveFeed)).BeginInit();
             this.tabControl1.SuspendLayout();
             this.tabPage1.SuspendLayout();
@@ -118,6 +121,7 @@
             // 
             // tabPage1
             // 
+            this.tabPage1.Controls.Add(this.label14);
             this.tabPage1.Controls.Add(this.mainAlteredFeed);
             this.tabPage1.Controls.Add(this.mainLiveFeed);
             this.tabPage1.Controls.Add(this.initButton);
@@ -129,6 +133,15 @@
             this.tabPage1.Text = "MainGUI";
             this.tabPage1.UseVisualStyleBackColor = true;
             // 
+            // label14
+            // 
+            this.label14.AutoSize = true;
+            this.label14.Location = new System.Drawing.Point(110, 344);
+            this.label14.Name = "label14";
+            this.label14.Size = new System.Drawing.Size(421, 17);
+            this.label14.TabIndex = 4;
+            this.label14.Text = "* To initialize place you hand in the center of the image on the left";
+            // 
             // mainAlteredFeed
             // 
             this.mainAlteredFeed.Location = new System.Drawing.Point(418, 6);
@@ -139,6 +152,8 @@
             // 
             // tabPage2
             // 
+            this.tabPage2.Controls.Add(this.label16);
+            this.tabPage2.Controls.Add(this.label15);
             this.tabPage2.Controls.Add(this.testInit);
             this.tabPage2.Controls.Add(this.capButton);
             this.tabPage2.Controls.Add(this.testingPic);
@@ -152,6 +167,16 @@
             this.tabPage2.TabIndex = 1;
             this.tabPage2.Text = "Testing";
             this.tabPage2.UseVisualStyleBackColor = true;
+            // 
+            // testInit
+            // 
+            this.testInit.Location = new System.Drawing.Point(7, 339);
+            this.testInit.Name = "testInit";
+            this.testInit.Size = new System.Drawing.Size(101, 37);
+            this.testInit.TabIndex = 10;
+            this.testInit.Text = "Initialize";
+            this.testInit.UseVisualStyleBackColor = true;
+            this.testInit.Click += new System.EventHandler(this.testInit_Click);
             // 
             // capButton
             // 
@@ -437,15 +462,23 @@
             this.label13.TabIndex = 4;
             this.label13.Text = "Capture Device";
             // 
-            // testInit
+            // label15
             // 
-            this.testInit.Location = new System.Drawing.Point(7, 339);
-            this.testInit.Name = "testInit";
-            this.testInit.Size = new System.Drawing.Size(101, 37);
-            this.testInit.TabIndex = 10;
-            this.testInit.Text = "Initialize";
-            this.testInit.UseVisualStyleBackColor = true;
-            this.testInit.Click += new System.EventHandler(this.testInit_Click);
+            this.label15.AutoSize = true;
+            this.label15.Location = new System.Drawing.Point(224, 339);
+            this.label15.Name = "label15";
+            this.label15.Size = new System.Drawing.Size(421, 17);
+            this.label15.TabIndex = 11;
+            this.label15.Text = "* To initialize place you hand in the center of the image on the left";
+            // 
+            // label16
+            // 
+            this.label16.AutoSize = true;
+            this.label16.Location = new System.Drawing.Point(224, 359);
+            this.label16.Name = "label16";
+            this.label16.Size = new System.Drawing.Size(450, 17);
+            this.label16.TabIndex = 12;
+            this.label16.Text = "* Capture will run the test, but only after the system has been initialzed";
             // 
             // MainGUI
             // 
@@ -460,8 +493,10 @@
             ((System.ComponentModel.ISupportInitialize)(this.mainLiveFeed)).EndInit();
             this.tabControl1.ResumeLayout(false);
             this.tabPage1.ResumeLayout(false);
+            this.tabPage1.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)(this.mainAlteredFeed)).EndInit();
             this.tabPage2.ResumeLayout(false);
+            this.tabPage2.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)(this.testingPic)).EndInit();
             this.groupBox3.ResumeLayout(false);
             this.groupBox3.PerformLayout();
@@ -515,6 +550,9 @@
         private System.Windows.Forms.Button capButton;
         private System.Windows.Forms.PictureBox testingPic;
         private System.Windows.Forms.Button testInit;
+        private System.Windows.Forms.Label label14;
+        private System.Windows.Forms.Label label16;
+        private System.Windows.Forms.Label label15;
     }
 }
 

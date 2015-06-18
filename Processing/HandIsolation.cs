@@ -13,7 +13,7 @@ using System.Threading.Tasks;
 
 namespace MotionGestureProcessing
 {
-    class HandIsolation
+    class HandIsolation : Process
     {
         public delegate void ProcessReadyHandler();
         public event ProcessReadyHandler ProcessReady;
@@ -36,6 +36,7 @@ namespace MotionGestureProcessing
         /// <param name="p_toInit">The initialization frame</param>
         public void initialize(Image p_toInit)
         {
+            ImageProcessing.findEdges(p_toInit);
             m_isInitialized = false;
             populateValidPixels(p_toInit);
             m_isInitialized = true;
@@ -85,42 +86,7 @@ namespace MotionGestureProcessing
             Processing.getInstance().IsolationImageFilled += m_isoImageHandler;
         }
 
-        /// <summary>
-        /// performs Bitmap.lockBits but does all the setup as well
-        /// </summary>
-        /// <param name="p_buffer">buffer to write out to</param>
-        /// <param name="p_image">Image to write</param>
-        /// <returns></returns>
-        private BitmapData lockBitmap(out byte[] p_buffer, ref Image p_image)
-        {
-            //Setting up a buffer to be used for concurrent read/write
-            int width = ((Bitmap)p_image).Width;
-            int height = ((Bitmap)p_image).Height;
-            Rectangle rect = new Rectangle(0, 0, width, height);
-            BitmapData data = ((Bitmap)p_image).LockBits(rect, ImageLockMode.ReadWrite,
-                                                         ((Bitmap)p_image).PixelFormat);
-            //This method returns bit per pixel, we need bytes.
-            int depth = Bitmap.GetPixelFormatSize(data.PixelFormat) / 8;
-
-            //Create a buffer to host the image data and copy the data in
-            p_buffer = new Byte[data.Width * data.Height * depth];
-            Marshal.Copy(data.Scan0, p_buffer, 0, p_buffer.Length);
-
-            return data;
-        }
-
-        /// <summary>
-        /// Unlocks the image, created this just for conformities sake
-        /// </summary>
-        /// <param name="p_buffer"></param>
-        /// <param name="p_data"></param>
-        /// <param name="p_image"></param>
-        private void unlockBitmap(ref byte[] p_buffer, ref BitmapData p_data, ref Image p_image)
-        {
-            //Copy it back and fill the image with the modified data
-            Marshal.Copy(p_buffer, 0, p_data.Scan0, p_buffer.Length);
-            ((Bitmap)p_image).UnlockBits(p_data);
-        }
+        
 
         /// <summary>
         /// Run vertically and horizantally from center until meeting an edge
@@ -172,72 +138,7 @@ namespace MotionGestureProcessing
         /// <param name="p_width">width of the image in pixels. Used for offset</param>
         private void dividedExpandSelectionRGB(byte[] p_buffer, Point start, Point end, DIRECTION p_direction, int p_width)
         {
-            int incX, incY, offset, curX, curY;
-            bool notEdge;
-            byte[] lastPixel = new byte[3];
-
-            switch (p_direction)
-            {
-                case DIRECTION.Up:
-                    incX = 0;
-                    incY = -1;
-                    break;
-                case DIRECTION.Right:
-                    incX = 1;
-                    incY = 0;
-                    break;
-                case DIRECTION.Down:
-                    incX = 0;
-                    incY = 1;
-                    break;
-                case DIRECTION.Left:
-                    incX = -1;
-                    incY = 0;
-                    break;
-                default:
-                    throw new Exception("Inconceivable!!");
-            }        
-
-            //Failed attempt at a simple edge detection algorithm.  I will implement something else;
-            for (int y = start.Y; y <= end.Y; ++y)
-                for (int x = start.X; x <= end.X; ++x)
-                {
-                    curX = x;
-                    curY = y;
-                    offset = ((y * p_width) + x) * 3;
-                    byte tolerance = (byte) (256 * .05);
-
-                    //initialize the last pixel
-                    lastPixel[0] = p_buffer[offset + 0];
-                    lastPixel[1] = p_buffer[offset + 1];
-                    lastPixel[2] = p_buffer[offset + 2];
-
-                    do 
-                    {
-                        //Just a basic transform from 1 dimension to 2
-                        offset = ((curY * p_width) + curX) * 3;
-
-                        //Check to see if each color is with the tolerance of the last pixel
-                        notEdge = (Math.Max(lastPixel[0], p_buffer[offset + 0]) == lastPixel[0] ? lastPixel[0] - p_buffer[offset + 0] : p_buffer[offset + 0] - lastPixel[0]) < tolerance &&
-                                  (Math.Max(lastPixel[1], p_buffer[offset + 1]) == lastPixel[1] ? lastPixel[1] - p_buffer[offset + 1] : p_buffer[offset + 1] - lastPixel[1]) < tolerance &&
-                                  (Math.Max(lastPixel[2], p_buffer[offset + 2]) == lastPixel[2] ? lastPixel[2] - p_buffer[offset + 2] : p_buffer[offset + 2] - lastPixel[2]) < tolerance;
-
-                        lastPixel[0] = p_buffer[offset + 0];
-                        lastPixel[1] = p_buffer[offset + 1];
-                        lastPixel[2] = p_buffer[offset + 2];
-
-                        if (notEdge)
-                        {
-                            //m_validPixelSemaphore.WaitOne();
-                            m_validPixels.Add(Color.FromArgb(lastPixel[2], lastPixel[1], lastPixel[0]).ToArgb());
-                            //m_validPixelSemaphore.Release();
-                        }
-
-                        curX += incX;
-                        curY += incY;
-                    }while(notEdge);
-                }
-
+            
         }
 
         /// <summary>

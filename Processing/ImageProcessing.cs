@@ -8,8 +8,17 @@ using System.Threading.Tasks;
 
 namespace MotionGestureProcessing
 {
-    class ImageProcessing
+    public class ImageProcessing
     {
+        //Sobel filters
+        private static int[,] m_xFilter = {{-1, 0, 1},
+                                           {-2, 0, 2},
+                                           {-1, 0, 1}};
+
+        private static int[,] m_yFilter = {{-1, -2, -1},
+                                           { 0,  0,  0},
+                                           { 1,  2,  1}};
+
         /// <summary>
         /// use the Canny edge detection algorithm
         /// </summary>
@@ -17,25 +26,62 @@ namespace MotionGestureProcessing
         /// <see cref="http://softwarebydefault.com/2013/05/11/image-edge-detection/"/>
         /// <param name="p_image">Image to find edges on</param>
         /// <returns>Bitmap with edges</returns>
-        public static byte[] findEdges(Image p_image)
+        public static Image findEdges(Image p_image)
         {
             //step 0
             //Convert an image to an byte array
             Image edgeImage = new Bitmap(p_image);
-            edgeImage.RotateFlip(RotateFlipType.Rotate180FlipY);
-            byte[] resultImage = new byte [p_image.Width * p_image.Height];
+            byte[] resultBuffer = new byte[edgeImage.Width * edgeImage.Height];
             byte[] pixelBuffer;
             BitmapData data = Process.lockBitmap(out pixelBuffer, ref edgeImage);
+            convert2GreyScale(ref pixelBuffer);
 
             //step 1 blur image
-            blurImage(ref pixelBuffer, p_image.Width, ref resultImage);
+            blurImage(ref pixelBuffer, edgeImage.Width, ref resultBuffer);
+
+            //TODO: comment this out and replace with this (pixelBuffer = resultBuffer;)
+            //Check the images as I go strictly for testing
+            Process.unlockBitmap(ref resultBuffer, ref data, ref edgeImage);
+            edgeImage.Save("SmoothedImage.bmp");
+            data = Process.lockBitmap(out pixelBuffer, ref edgeImage);
+
+            //step 2 apply sobel filters to find gradients
+            float[,] angleMap = new float[edgeImage.Height, edgeImage.Width];
+            findGradients(ref pixelBuffer, edgeImage.Width, ref resultBuffer, ref angleMap);
+
+            //TODO: comment this out and replace with this (pixelBuffer = resultBuffer;)
+            Process.unlockBitmap(ref resultBuffer, ref data, ref edgeImage);
+            edgeImage.Save("FilteredImage.bmp");
+            data = Process.lockBitmap(out pixelBuffer, ref edgeImage);
+
+            //step 3 clear out all non local maximum values
+            nonMaxSuppression(ref pixelBuffer, edgeImage.Width, ref resultBuffer, angleMap);
 
             //Restore byte array to image
-            Process.unlockBitmap(ref resultImage, ref data, ref edgeImage);
+            Process.unlockBitmap(ref resultBuffer, ref data, ref edgeImage);
+            edgeImage.Save("NonMaxSuppressImage.bmp");
 
-            edgeImage.Save("FilteredImage.bmp");
+            return edgeImage;
+        }
 
-            return resultImage;
+        /// <summary>
+        /// converts image to greyscale
+        /// </summary>
+        /// <param name="pixelBuffer">Buffer array to convert</param>
+        private static void convert2GreyScale(ref byte[] pixelBuffer)
+        {
+            float rgb;
+
+            for (int i = 0; i < pixelBuffer.Length; i += 4)
+            {
+                //grey scale transform is .2R + .59G + .11B
+                rgb = pixelBuffer[i] * 0.11f;
+                rgb += pixelBuffer[i + 1] * 0.59f;
+                rgb += pixelBuffer[i + 2] * .2f;
+
+                pixelBuffer[i] = pixelBuffer[i + 1] = pixelBuffer[i + 2] = (byte)rgb;
+                pixelBuffer[i + 3] = 255;
+            }
         }
 
         /// <summary>
@@ -57,7 +103,7 @@ namespace MotionGestureProcessing
 
             //perform filtering
             int limit = kernalSize / 2;
-            float red, green, blue;
+            double red, green, blue;
             int byteOffset, filterOffset;
             p_resultImage = p_image;
 
@@ -66,8 +112,8 @@ namespace MotionGestureProcessing
             for (int y = limit; y < height - limit; ++y)
                 for (int x = limit; x < p_width - limit; ++x)
                 {
-                    red = 0;
-                    green = 0;
+                    //red = 0;
+                    //green = 0;
                     blue = 0;
                     byteOffset = ((y * p_width) + x) * 4;
 
@@ -76,22 +122,24 @@ namespace MotionGestureProcessing
                         {
                             //sum all the values in the gausian filter
                             filterOffset = byteOffset + ((filterY * p_width) + filterX) * 4;
-                            blue += (float)(p_image[filterOffset]) *
+                            blue += (double)p_image[filterOffset] *
                                         gausianKernel[limit + filterY, limit + filterX];
-                            green += (float)(p_image[filterOffset + 1]) *
-                                        gausianKernel[limit + filterY, limit + filterX];
-                            red += (float)(p_image[filterOffset + 2]) *
-                                        gausianKernel[limit + filterY, limit + filterX];
+                            //green += (double)(p_image[filterOffset + 1]) *
+                            //            gausianKernel[limit + filterY, limit + filterX];
+                            //red += (double)(p_image[filterOffset + 2]) *
+                            //            gausianKernel[limit + filterY, limit + filterX];
                         }
                     //Average them so they are within the byte range
                     blue /= weight;
-                    green /= weight;
-                    red /= weight;
+                    //green /= weight;
+                    //red /= weight;
 
                     //Put them into the result image
-                    p_resultImage[byteOffset] = (byte)blue;
-                    p_resultImage[byteOffset + 1] = (byte)green;
-                    p_resultImage[byteOffset + 2] = (byte)red;
+                    p_resultImage[byteOffset] = p_resultImage[byteOffset + 1] =
+                        p_resultImage[byteOffset + 2] = (byte)blue;
+
+                    //p_resultImage[byteOffset + 1] = (byte)green;
+                    //p_resultImage[byteOffset + 2] = (byte)red;
                     p_resultImage[byteOffset + 3] = 255;
                 }
         }
@@ -155,6 +203,149 @@ namespace MotionGestureProcessing
             }
 
             return sum;
+        }
+
+        /// <summary>
+        /// Apply Sobel filtering to the smoothed image
+        /// </summary>
+        /// <param name="p_image">Byte array of Smoothed image</param>
+        /// <param name="p_width">width in pixels</param>
+        /// <param name="p_resultImage">Byte array to write the results to</param>
+        private static void findGradients(ref byte[] p_image, int p_width, ref byte[] p_resultImage, ref float[,] p_angleMap)
+        {
+            //variables needed for this funciton
+            int limit = 3 / 2;
+            double blueX, greenX, redX;
+            double blueY, greenY, redY;
+            double blueTot, greenTot, redTot;
+            int byteOffset, filterOffset, xFilterVal, yFilterVal;
+            float pi = (float)Math.PI;
+
+            int height = p_image.Length / (p_width * 4);
+
+            //Iterate through pixels
+            for (int y = limit; y < height - limit; ++y)
+                for (int x = limit; x < p_width - limit; ++x)
+                {
+                    blueX = greenX = redX = 0.0;
+                    blueY = greenY = redY = 0.0;
+                    blueTot = greenTot = redTot = 0.0;
+
+                    byteOffset = ((y * p_width) + x) * 4;
+
+                    //Apply sobel filters
+                    for (int filterY = -limit; filterY <= limit; ++filterY)
+                        for (int filterX = -limit; filterX <= limit; ++filterX)
+                        {
+                            filterOffset = byteOffset + ((filterY * p_width) + filterX) * 4;
+                            xFilterVal = m_xFilter[limit + filterY, limit + filterX];
+                            yFilterVal = m_yFilter[limit + filterY, limit + filterX];
+
+                            blueX  += (double)p_image[filterOffset] * xFilterVal;
+                            //greenX += (double)p_image[filterOffset + 1] * xFilterVal;
+                            //redX   += (double)p_image[filterOffset + 2] * xFilterVal;
+
+                            blueY  += (double)p_image[filterOffset] * yFilterVal;
+                            //greenY += (double)p_image[filterOffset + 1] * yFilterVal;
+                            //redX   += (double)p_image[filterOffset + 2] * yFilterVal;
+                        }
+
+                    //Take the cartesian product of colors
+                    blueTot = Math.Sqrt((blueX * blueX) +
+                                        (blueY * blueY));
+                    //greenTot = Math.Sqrt((greenX * greenX) +
+                    //                     (greenY * greenY));
+                    //redTot = Math.Sqrt((redX * redX) +
+                    //                   (redY * redY));
+
+                    p_resultImage[byteOffset] = p_resultImage[byteOffset + 1] = 
+                        p_resultImage[byteOffset + 2] = (byte)blueTot;
+                    //p_resultImage[byteOffset + 1] = (byte)greenTot;
+                    //p_resultImage[byteOffset + 2] = (byte)redTot;
+                    p_resultImage[byteOffset + 3] = 255;
+
+                    if (blueX == 0)
+                        p_angleMap[y, x] = 90f;
+                    else
+                        p_angleMap[y, x] = (float)Math.Abs(Math.Atan(blueY / blueX) * 180 / pi);
+                }
+        }
+       
+        /// <summary>
+        /// This removes the pixels that arent edges
+        /// </summary>
+        /// <param name="p_image">Gradient Image byte array</param>
+        /// <param name="p_width">width in pixels of image</param>
+        /// <param name="p_resultBuffer">byte array to store results</param>
+        /// <param name="p_angleMap">tangents of the angles, used in Canny edge deteciton</param>
+        private static void nonMaxSuppression(ref byte[] p_image, int p_width, ref byte[] p_resultBuffer, float[,] p_angleMap)
+        {
+            int limit = 5 / 2;
+            int height = p_image.Length / (p_width * 4);
+            int byteOffset, posTanOffset, negTanOffset;
+
+            for (int y = limit; y < height - limit; ++y)
+                for (int x = limit; x < p_width - limit; ++x)
+                {
+                    byteOffset = ((y * p_width) + x) * 4;
+
+                    //Horizantal edge
+                    if (p_angleMap[y, x] <= 22.5 || p_angleMap[y, x] > 157.5)
+                    {
+                        posTanOffset = byteOffset + 4;
+                        negTanOffset = byteOffset - 4;
+                        if (p_image[byteOffset] < p_image[posTanOffset] || 
+                            p_image[byteOffset] < p_image[negTanOffset])
+                        {
+                            p_resultBuffer[byteOffset] = 
+                                p_resultBuffer[byteOffset + 1] =
+                                p_resultBuffer[byteOffset + 2] = 0;
+                            p_resultBuffer[byteOffset + 3] = 255;
+                        }
+                    }
+                    //+45 degree edge
+                    else if (p_angleMap[y, x] <= 67.5)
+                    {
+                        posTanOffset = byteOffset + (p_width - 1) * 4;
+                        negTanOffset = byteOffset - (p_width - 1) * 4;
+                        if (p_image[byteOffset] < p_image[posTanOffset] ||
+                            p_image[byteOffset] < p_image[negTanOffset])
+                        {
+                            p_resultBuffer[byteOffset] = 
+                                p_resultBuffer[byteOffset + 1] =
+                                p_resultBuffer[byteOffset + 2] = 0;
+                            p_resultBuffer[byteOffset + 3] = 255;
+                        }
+                    }
+                    //Vertical edge
+                    else if (p_angleMap[y, x] <= 112.5)
+                    {
+                        posTanOffset = byteOffset + p_width * 4;
+                        negTanOffset = byteOffset - p_width * 4;
+                        if (p_image[byteOffset] < p_image[posTanOffset] ||
+                            p_image[byteOffset] < p_image[negTanOffset])
+                        {
+                            p_resultBuffer[byteOffset] = 
+                                p_resultBuffer[byteOffset + 1] =
+                                p_resultBuffer[byteOffset + 2] = 0;
+                            p_resultBuffer[byteOffset + 3] = 255;
+                        }
+                    }
+                    //-45 degree edge
+                    else
+                    {
+                        posTanOffset = byteOffset + (p_width + 1) * 4;
+                        negTanOffset = byteOffset - (p_width + 1) * 4;
+                        if (p_image[byteOffset] < p_image[posTanOffset] ||
+                            p_image[byteOffset] < p_image[negTanOffset])
+                        {
+                            p_resultBuffer[byteOffset] = 
+                                p_resultBuffer[byteOffset + 1] =
+                                p_resultBuffer[byteOffset + 2] = 0;
+                            p_resultBuffer[byteOffset + 3] = 255;
+                        }
+                    }
+                }
         }
     }
 }

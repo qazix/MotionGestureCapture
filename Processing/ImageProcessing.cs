@@ -57,9 +57,21 @@ namespace MotionGestureProcessing
             //step 3 clear out all non local maximum values
             nonMaxSuppression(ref pixelBuffer, edgeImage.Width, ref resultBuffer, angleMap);
 
-            //Restore byte array to image
+            //TODO: comment this out and replace with this (pixelBuffer = resultBuffer;)
             Process.unlockBitmap(ref resultBuffer, ref data, ref edgeImage);
             edgeImage.Save("NonMaxSuppressImage.bmp");
+            data = Process.lockBitmap(out pixelBuffer, ref edgeImage);
+
+            //Step 4 dual edge thresholding
+            thresholding(ref pixelBuffer, edgeImage.Width, ref resultBuffer);
+            pixelBuffer = resultBuffer; //thresholding doens't give a human recognizable output
+
+            //Step 5 HysteresisThresholding
+            hysterisisThresholding(ref pixelBuffer, edgeImage.Width, ref resultBuffer);
+
+            //Restore byte array to image
+            Process.unlockBitmap(ref resultBuffer, ref data, ref edgeImage);
+            edgeImage.Save("Thresholding.bmp");
 
             return edgeImage;
         }
@@ -214,7 +226,7 @@ namespace MotionGestureProcessing
         private static void findGradients(ref byte[] p_image, int p_width, ref byte[] p_resultImage, ref float[,] p_angleMap)
         {
             //variables needed for this funciton
-            int limit = 3 / 2;
+            int limit = m_xFilter.GetLength(0) / 2;
             double blueX, greenX, redX;
             double blueY, greenY, redY;
             double blueTot, greenTot, redTot;
@@ -280,7 +292,7 @@ namespace MotionGestureProcessing
         /// <param name="p_angleMap">tangents of the angles, used in Canny edge deteciton</param>
         private static void nonMaxSuppression(ref byte[] p_image, int p_width, ref byte[] p_resultBuffer, float[,] p_angleMap)
         {
-            int limit = 5 / 2;
+            int limit = m_xFilter.GetLength(0) / 2; //Because my sobel filter is 3 wide
             int height = p_image.Length / (p_width * 4);
             int byteOffset, posTanOffset, negTanOffset;
 
@@ -346,6 +358,255 @@ namespace MotionGestureProcessing
                         }
                     }
                 }
+        }
+
+        /// <summary>
+        /// This is a rather simple process of only populating the result buffer with values that exceed 
+        /// 
+        /// </summary>
+        /// <param name="p_image"></param>
+        /// <param name="p_width"></param>
+        /// <param name="p_resultBuffer"></param>
+        private static void thresholding(ref byte[] p_image, int p_width, ref byte[] p_resultBuffer)
+        {
+            int limit = m_xFilter.GetLength(0) / 2;
+            int height = p_image.Length / (p_width * 4);
+            int byteOffset;
+
+            //Determine the thresholds
+            float maxThreshold = otsuThreshold(p_image) * 0.4f;  //Otsu's algorithm cut out too much
+            float minThreshold = 0.5f * maxThreshold;
+
+            //Dual thresholding
+            for (int y = limit; y < height - limit; ++y)
+                for (int x = limit; x < p_width - limit; ++x)
+                {
+                    byteOffset = ((y * p_width) + x) * 4;
+                    
+                    //set flags for strong and weak edges, 1 and 2 repectively
+                    if (p_image[byteOffset] >= maxThreshold)
+                        p_resultBuffer[byteOffset] = 1;
+
+                    else if (p_image[byteOffset] >= minThreshold)
+                        p_resultBuffer[byteOffset] = 2;
+
+                    else
+                        p_resultBuffer[byteOffset] = 0;
+                }
+        }
+
+        /// <summary>
+        /// Otsu wanted a dynamic means of finding a good threshold in image processing
+        /// I can only barely grasp what this actually does so the comments are lacking
+        /// </summary>
+        /// <seealso cref="https://en.wikipedia.org/wiki/Otsu%27s_method"/>
+        /// <param name="p_image">Image to evaluate</param>
+        /// <returns></returns>
+        private static float otsuThreshold(byte[] p_image)
+        {
+            int total = p_image.Length / 4; //total is pixels in the image
+            int[] histogram = new int[256]; //a byte only has 256 values
+
+            //populate histogram
+            for (int i = 0; i < total; ++i)
+            {
+                //increment the histogram for each pixel value
+                //I use i * 4 because the compiler will convert it to i << 2 which is 
+                // faster than adding 4 every iteration
+                ++histogram[p_image[i * 4]];
+            }
+
+            int omegaB, omegaF, sum, sumB;
+            float mewB, mewF, max, threshold1, threshold2, between;
+
+            omegaB = omegaF = sum = sumB = 0;
+            mewB = mewF = max = threshold1 = threshold2 = between = 0;
+
+            //Populate a sum, this is multiplied by i for uniqueness
+            for (int i = 0; i < histogram.Length; ++i)
+                sum += i * histogram[i];
+
+            for (int i = 0; i < histogram.Length; ++i)
+            {
+                //add the current value to omegaB
+                omegaB += histogram[i];
+                if (omegaB == 0)
+                    continue;
+
+                //omegaF is the complement of omegaB
+                omegaF = total - omegaB;
+                if (omegaF == 0)
+                    break;
+
+                //SumB uses the same process as sum to track progress
+                sumB += i * histogram[i];
+                mewB = sumB / omegaB;
+                mewF = (sum - sumB) / omegaF;
+
+                //From here down I'm lost
+                between = omegaB * omegaF * (mewB - mewF) * (mewB - mewF);
+
+                if (between >= max)
+                {
+                    threshold1 = i;
+                    if (between > max)
+                        threshold2 = i;
+
+                    max = between;
+                }
+            }
+
+            return (threshold1 + threshold2) / 2;
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="p_image"></param>
+        /// <param name="p_width"></param>
+        /// <param name="p_resultBuffer"></param>
+        private static void hysterisisThresholding(ref byte[] p_image, int p_width, ref byte[] p_resultBuffer)
+        {
+            int limit = m_xFilter.GetLength(0) / 2;
+            int height = p_image.Length / (p_width * 4);
+            int byteOffset;
+
+            int[,] edgeMap = new int[height, p_width];
+            int[,] resultMap = new int[height, p_width];
+            int[,] visitedMap = new int[height, p_width];
+
+            //populate edgemap
+            for (int y = limit; y < height - limit; ++y)
+                for (int x = limit; x < p_width - limit; ++x)
+                {
+                    byteOffset = ((y * p_width) + x) * 4;
+
+                    if (p_image[byteOffset] == 1)
+                        edgeMap[y, x] = 1;
+                    else if (p_image[byteOffset] == 2)
+                        edgeMap[y, x] = 2;
+                }
+
+            resultMap = edgeMap;
+
+            //Perform traversal process
+            for (int y = limit; y < height - limit; ++y)
+                for (int x = limit; x < p_width - limit; ++x)
+                {
+                    byteOffset = ((y * p_width) + x) * 4;
+
+                    if (p_image[byteOffset] == 1)
+                    {
+                        traverse(x, y, ref visitedMap, ref edgeMap, ref resultMap);
+                        visitedMap[y, x] = 1;
+                    }
+                }
+
+            //Write results to resultbuffer
+            for (int y = limit; y < height - limit; ++y)
+                for (int x = limit; x < p_width - limit; ++x)
+                {
+                    byteOffset = ((y * p_width) + x) * 4;
+                    
+                    if (resultMap[y, x] == 1)
+                    {
+                        p_resultBuffer[byteOffset] = p_resultBuffer[byteOffset + 1] =
+                            p_resultBuffer[byteOffset + 2] = 255;
+                    }
+                    else
+                    {
+                        p_resultBuffer[byteOffset] = p_resultBuffer[byteOffset + 1] =
+                            p_resultBuffer[byteOffset + 2] = 0;
+                    }
+
+                    p_resultBuffer[byteOffset + 3] = 255;
+                }
+        }
+
+        /// <summary>
+        /// A recursive walking algorithm to ensure all weak edges are attached
+        ///  to strong edges
+        /// </summary>
+        /// <param name="X">X position</param>
+        /// <param name="Y">Y position</param>
+        /// <param name="visitedMap">Map to determine if the traversal has visited this square</param>
+        /// <param name="p_width">width of image in pixels</param>
+        private static void traverse(int X, int Y, ref int[,] visitedMap, ref int[,] edgeMap, ref int[,] resultMap)
+        {
+            if (visitedMap[Y, X] == 1)
+                return;
+
+            //1
+            if (edgeMap[Y + 1, X] == 2)
+            {
+                resultMap[Y + 1, X] = 1;
+                visitedMap[Y + 1, X] = 1;
+                traverse(X, Y + 1, ref visitedMap, ref edgeMap, ref resultMap);
+                return;
+            }
+
+            //2
+            if (edgeMap[Y + 1, X - 1] == 2)
+            {
+                resultMap[Y + 1, X - 1] = 1;
+                visitedMap[Y + 1, X - 1] = 1;
+                traverse(X - 1, Y + 1, ref visitedMap, ref edgeMap, ref resultMap);
+                return;
+            }
+
+            //3
+            if (edgeMap[Y, X - 1] == 2)
+            {
+                resultMap[Y, X - 1] = 1;
+                visitedMap[Y, X - 1] = 1;
+                traverse(X - 1, Y, ref visitedMap, ref edgeMap, ref resultMap);
+                return;
+            }
+
+            //4
+            if (edgeMap[Y - 1, X - 1] == 2)
+            {
+                resultMap[Y - 1, X - 1] = 1;
+                visitedMap[Y - 1, X - 1] = 1;
+                traverse(X - 1, Y - 1, ref visitedMap, ref edgeMap, ref resultMap);
+                return;
+            }
+
+            //5
+            if (edgeMap[Y - 1, X] == 2)
+            {
+                resultMap[Y - 1, X] = 1;
+                visitedMap[Y - 1, X] = 1;
+                traverse(X, Y - 1, ref visitedMap, ref edgeMap, ref resultMap);
+                return;
+            }
+
+            //6
+            if (edgeMap[Y - 1, X + 1] == 2)
+            {
+                resultMap[Y - 1, X + 1] = 1;
+                visitedMap[Y - 1, X + 1] = 1;
+                traverse(X + 1, Y - 1, ref visitedMap, ref edgeMap, ref resultMap);
+                return;
+            }
+
+            //7
+            if (edgeMap[Y, X + 1] == 2)
+            {
+                resultMap[Y, X + 1] = 1;
+                visitedMap[Y, X + 1] = 1;
+                traverse(X + 1, Y, ref visitedMap, ref edgeMap, ref resultMap);
+                return;
+            }
+
+            //8
+            if (edgeMap[Y + 1, X -+ 1] == 2)
+            {
+                resultMap[Y + 1, X + 1] = 1;
+                visitedMap[Y + 1, X + 1] = 1;
+                traverse(X + 1, Y + 1, ref visitedMap, ref edgeMap, ref resultMap);
+                return;
+            }
         }
     }
 }

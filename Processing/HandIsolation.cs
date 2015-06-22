@@ -28,7 +28,7 @@ namespace MotionGestureProcessing
         /// Empty constructor
         /// </summary>
         public HandIsolation()
-        { m_validPixelSemaphore = new Semaphore(0, 1); }
+        { }
 
         /// <summary>
         /// First populates the bit array for values then sets up the event listener
@@ -36,20 +36,31 @@ namespace MotionGestureProcessing
         /// <param name="p_toInit">The initialization frame</param>
         public void initialize(Image p_toInit)
         {
-            ImageProcessing.findEdges(p_toInit);
+            Image edges = ImageProcessing.findEdges(p_toInit);
+
+            if (edges.PixelFormat != p_toInit.PixelFormat)
+                convert2PixelFormat(ref p_toInit);
+
             m_isInitialized = false;
-            populateValidPixels(p_toInit);
+            populateValidPixels(p_toInit, edges);
             m_isInitialized = true;
             
             setupListener();
             doWork(p_toInit);
         }
 
+        private void convert2PixelFormat(ref Image p_toInit)
+        {
+            Bitmap converted = new Bitmap(p_toInit);
+
+            p_toInit = converted;
+        }
+
         /// <summary>
         /// Will populate the bitArray
         /// </summary>
         /// <param name="p_toInit">Image to scan</param>
-        private void populateValidPixels(Image p_toInit)
+        private void populateValidPixels(Image p_toInit, Image p_edges)
         {
             //Clear out an old but array
             if (m_validPixels != null)
@@ -70,7 +81,7 @@ namespace MotionGestureProcessing
                     m_validPixels.Add(color.ToArgb());
                 }
 
-            //expandSelection(p_toInit);
+            expandSelection(p_toInit, p_edges);
         }
 
         /// <summary>
@@ -85,17 +96,21 @@ namespace MotionGestureProcessing
 
             Processing.getInstance().IsolationImageFilled += m_isoImageHandler;
         }
-
-        
+      
 
         /// <summary>
         /// Run vertically and horizantally from center until meeting an edge
         /// </summary>
         /// <param name="p_image"></param>
-        private void expandSelection(Image p_image)
+        private void expandSelection(Image p_image, Image p_edges)
         {
             byte[] buffer;
+            byte[] edgeBuffer;
+            int byteOffset;
+            bool isEdge;
+
             BitmapData data = lockBitmap(out buffer, ref p_image);
+            BitmapData edgeData = lockBitmap(out edgeBuffer, ref p_edges);
 
             //Create the points
             Point topLeft = new Point((p_image.Width / 2) - 50, (p_image.Height / 2 - 50));
@@ -103,42 +118,98 @@ namespace MotionGestureProcessing
             Point bottomLeft = new Point((p_image.Width / 2) - 50, (p_image.Height / 2 + 50));
             Point bottomRight = new Point((p_image.Width / 2) + 50, (p_image.Height / 2 + 50));
 
-            Parallel.Invoke(
-                () =>
-                {
-                    //going up
-                    dividedExpandSelectionRGB(buffer, topLeft, topRight, DIRECTION.Up, data.Width);
-                },
-                () =>
-                {
-                    //Right
-                    dividedExpandSelectionRGB(buffer, topRight, bottomRight, DIRECTION.Right, data.Width);
-                },
-                () =>
-                {
-                    //Down
-                    dividedExpandSelectionRGB(buffer, bottomLeft, bottomRight, DIRECTION.Down, data.Width);
-                },
-                () =>
-                {
-                    //Left
-                    dividedExpandSelectionRGB(buffer, topLeft, bottomLeft, DIRECTION.Left, data.Width);
-                });
+            int y, x;
 
+            #region Expand Up
+            isEdge = false;
+            for (y = topLeft.Y; isEdge == false && y > 3; --y)
+                for (x = topLeft.X; x < topRight.X && isEdge == false; ++x)
+                {
+                    byteOffset = ((y * p_image.Width) + x) * 4;
+
+                    //is an edge
+                    if (edgeBuffer[byteOffset] > 0)
+                        isEdge = true;
+                    else
+                    {
+                        m_validPixels.Add(Color.FromArgb(buffer[byteOffset + 2], buffer[byteOffset + 1],
+                                                         buffer[byteOffset]).ToArgb());
+                    }
+                }
+            #endregion
+
+            topLeft.Y = y - 1;
+            topRight.Y = y - 2; //because the left will be 1 pixel higher than the right
+
+            #region Expand Right
+            isEdge = false;
+            for (x = topRight.X; isEdge == false && x < p_image.Width - 3; ++x)
+                for (y = topRight.Y; y < bottomRight.Y && isEdge == false; ++y)
+                {
+                    byteOffset = ((y * p_image.Width) + x) * 4;
+
+                    //is an edge
+                    if (edgeBuffer[byteOffset] > 0)
+                        isEdge = true;
+                    else
+                    {
+                        m_validPixels.Add(Color.FromArgb(buffer[byteOffset + 2], buffer[byteOffset + 1],
+                                                         buffer[byteOffset]).ToArgb());
+                    }
+                }
+            #endregion
+
+            topRight.X = x - 1;
+            bottomRight.X = x - 2;
+
+            #region Expand Down
+            isEdge = false;
+            for (y = bottomLeft.Y; isEdge == false && y < p_image.Height - 3; ++y)
+                for (x = bottomLeft.X; x < bottomRight.X && isEdge == false; ++x)
+                {
+                    byteOffset = ((y * p_image.Width) + x) * 4;
+
+                    //is an edge
+                    if (edgeBuffer[byteOffset] > 0)
+                        isEdge = true;
+                    else
+                    {
+                        m_validPixels.Add(Color.FromArgb(buffer[byteOffset + 2], buffer[byteOffset + 1],
+                                                         buffer[byteOffset]).ToArgb());
+                    }
+                }
+            #endregion
+
+            bottomRight.Y = y - 1;
+            bottomLeft.Y = y - 2;
+
+            #region Expand Left
+
+            isEdge = false;
+            for (x = topLeft.X; isEdge == false && x > 3; --x)
+            {
+                for (y = topLeft.Y; y < bottomLeft.Y && isEdge == false; ++y)
+                {
+                    byteOffset = ((y * p_image.Width) + x) * 4;
+
+                    //is an edge
+                    if (edgeBuffer[byteOffset] > 0)
+                        isEdge = true;
+                    else
+                    {
+                        m_validPixels.Add(Color.FromArgb(buffer[byteOffset + 2], buffer[byteOffset + 1],
+                                                         buffer[byteOffset]).ToArgb());
+                    }
+                }
+            }
+
+            #endregion
+
+            topLeft.X = x - 1;
+            bottomLeft.X = x - 2;
+
+            unlockBitmap(ref edgeBuffer, ref edgeData, ref p_edges);
             unlockBitmap(ref buffer, ref data, ref p_image);
-        }
-
-        /// <summary>
-        /// Expands the valid pixels by going to the left and using a simple step edge detector
-        ///  will stop upon reaching an edge.
-        /// </summary>
-        /// <param name="start">Point for starting always Left to right, top to bottom</param>
-        /// <param name="end">Point to end</param>
-        /// <param name="p_direction">flag for control</param>
-        /// <param name="p_width">width of the image in pixels. Used for offset</param>
-        private void dividedExpandSelectionRGB(byte[] p_buffer, Point start, Point end, DIRECTION p_direction, int p_width)
-        {
-            
         }
 
         /// <summary>
@@ -227,9 +298,6 @@ namespace MotionGestureProcessing
         /// <param name="width">Width in pixels used to determine offset</param>
         private void dividedDoWorkRGB(byte[] p_buffer, int startX, int startY, int endX, int endY, int width)
         {
-            //Constant to be used in filling in the non valid points.
-            Color BLACK = Color.Black;
-
             //To be overwritten 
             int offset;
             int curPixelColor;
@@ -244,9 +312,8 @@ namespace MotionGestureProcessing
                     curPixelColor = Color.FromArgb(p_buffer[offset + 2], p_buffer[offset + 1], p_buffer[offset]).ToArgb();
                     if (!m_validPixels.Contains(curPixelColor))
                     {
-                        p_buffer[offset + 0] = BLACK.B;
-                        p_buffer[offset + 1] = BLACK.G;
-                        p_buffer[offset + 2] = BLACK.R;
+                        p_buffer[offset + 0] = p_buffer[offset + 1] = 
+                        p_buffer[offset + 2] = 0; //black is all zeroes
                     }
                 }
         }
@@ -277,10 +344,9 @@ namespace MotionGestureProcessing
                                                    p_buffer[offset + 1], p_buffer[offset]).ToArgb();
                     if (!m_validPixels.Contains(curPixelColor))
                     {
-                        p_buffer[offset + 0] = BLACK.B;
-                        p_buffer[offset + 1] = BLACK.G;
-                        p_buffer[offset + 2] = BLACK.R;
-                        p_buffer[offset + 3] = BLACK.A;
+                        p_buffer[offset + 0] = p_buffer[offset + 1] = 
+                        p_buffer[offset + 2] = 0;
+                        p_buffer[offset + 3] = 255;
                     }
                 }
         }

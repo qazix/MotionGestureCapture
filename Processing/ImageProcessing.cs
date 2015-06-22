@@ -42,7 +42,7 @@ namespace MotionGestureProcessing
             //TODO: comment this out and replace with this (pixelBuffer = resultBuffer;)
             //Check the images as I go strictly for testing
             Process.unlockBitmap(ref resultBuffer, ref data, ref edgeImage);
-            edgeImage.Save("SmoothedImage.bmp");
+            //edgeImage.Save("FilteredImage.bmp");
             data = Process.lockBitmap(out pixelBuffer, ref edgeImage);
 
             //step 2 apply sobel filters to find gradients
@@ -51,7 +51,7 @@ namespace MotionGestureProcessing
 
             //TODO: comment this out and replace with this (pixelBuffer = resultBuffer;)
             Process.unlockBitmap(ref resultBuffer, ref data, ref edgeImage);
-            edgeImage.Save("FilteredImage.bmp");
+            //edgeImage.Save("FilteredImage.bmp");
             data = Process.lockBitmap(out pixelBuffer, ref edgeImage);
 
             //step 3 clear out all non local maximum values
@@ -59,12 +59,15 @@ namespace MotionGestureProcessing
 
             //TODO: comment this out and replace with this (pixelBuffer = resultBuffer;)
             Process.unlockBitmap(ref resultBuffer, ref data, ref edgeImage);
-            edgeImage.Save("NonMaxSuppressImage.bmp");
+            //edgeImage.Save("FilteredImage.bmp");
             data = Process.lockBitmap(out pixelBuffer, ref edgeImage);
 
             //Step 4 dual edge thresholding
             thresholding(ref pixelBuffer, edgeImage.Width, ref resultBuffer);
-            pixelBuffer = resultBuffer; //thresholding doens't give a human recognizable output
+
+            //thresholding doens't give a human recognizable output
+            Process.unlockBitmap(ref resultBuffer, ref data, ref edgeImage);
+            data = Process.lockBitmap(out pixelBuffer, ref edgeImage);
 
             //Step 5 HysteresisThresholding
             hysterisisThresholding(ref pixelBuffer, edgeImage.Width, ref resultBuffer);

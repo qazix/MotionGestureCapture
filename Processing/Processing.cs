@@ -52,10 +52,13 @@ namespace MotionGestureProcessing
         private Processing()
         {
             m_camCapture = CamCapture.getInstance();
-            CamToIsolation   = new Semaphore(0, 1);
-            IsolationToPCA   = new Semaphore(0, 1);
-            PCAToGestures    = new Semaphore(0, 1);
-            GesturesToReturn = new Semaphore(0, 1);
+            CamToIsolation   = new Semaphore(1, 1);
+            IsolationToPCA   = new Semaphore(1, 1);
+            PCAToGestures    = new Semaphore(1, 1);
+            GesturesToReturn = new Semaphore(1, 1);
+
+            CamToIsolation.WaitOne();
+            CamToIsolation.Release();
 
             m_handIso = new HandIsolation();
         }

@@ -47,5 +47,14 @@ namespace MotionGestureProcessing
             Marshal.Copy(p_buffer, 0, p_data.Scan0, p_buffer.Length);
             ((Bitmap)p_image).UnlockBits(p_data);
         }
+
+        protected abstract void setupListener();
+
+        /// <summary>
+        /// What this process does to an image
+        /// </summary>
+        /// <param name="obj">Data pertaining to this image</param>
+        /// <param name="p_image">Image to be processed</param>
+        protected abstract void doWork(Object obj, Image p_image);
     }
 }

@@ -21,8 +21,11 @@ namespace MotionGestureProcessing
         private Processing.ImageReadyHandler m_isoImageHandler;
         private static HashSet<int> m_validPixels;
         private static bool m_isInitialized;
-        private Semaphore m_validPixelSemaphore;
-        private enum DIRECTION { Right, Left, Up, Down };
+
+        Point m_topLeft;
+        Point m_topRight;
+        Point m_bottomLeft;
+        Point m_bottomRight;
 
         /// <summary>
         /// Empty constructor
@@ -34,7 +37,7 @@ namespace MotionGestureProcessing
         /// First populates the bit array for values then sets up the event listener
         /// </summary>
         /// <param name="p_toInit">The initialization frame</param>
-        public void initialize(Image p_toInit)
+        public override void initialize(Image p_toInit)
         {
             Image edges = ImageProcessing.findEdges(p_toInit);
 
@@ -46,7 +49,7 @@ namespace MotionGestureProcessing
             m_isInitialized = true;
             
             setupListener();
-            doWork(p_toInit);
+            doWork(new imageData(true), p_toInit);
         }
 
         private void convert2PixelFormat(ref Image p_toInit)
@@ -87,16 +90,15 @@ namespace MotionGestureProcessing
         /// <summary>
         /// Establishes a listening connection 
         /// </summary>
-        private void setupListener()
+        private override void setupListener()
         {
             m_isoImageHandler = (obj, image) =>
             {
-                this.doWork(image);
+                this.doWork(obj, image);
             };
 
             Processing.getInstance().IsolationImageFilled += m_isoImageHandler;
-        }
-      
+        }    
 
         /// <summary>
         /// Run vertically and horizantally from center until meeting an edge
@@ -113,17 +115,17 @@ namespace MotionGestureProcessing
             BitmapData edgeData = lockBitmap(out edgeBuffer, ref p_edges);
 
             //Create the points
-            Point topLeft = new Point((p_image.Width / 2) - 50, (p_image.Height / 2 - 50));
-            Point topRight = new Point((p_image.Width / 2) + 50, (p_image.Height / 2 - 50));
-            Point bottomLeft = new Point((p_image.Width / 2) - 50, (p_image.Height / 2 + 50));
-            Point bottomRight = new Point((p_image.Width / 2) + 50, (p_image.Height / 2 + 50));
+            m_topLeft = new Point((p_image.Width / 2) - 50, (p_image.Height / 2 - 50));
+            m_topRight = new Point((p_image.Width / 2) + 50, (p_image.Height / 2 - 50));
+            m_bottomLeft = new Point((p_image.Width / 2) - 50, (p_image.Height / 2 + 50));
+            m_bottomRight = new Point((p_image.Width / 2) + 50, (p_image.Height / 2 + 50));
 
             int y, x;
 
             #region Expand Up
             isEdge = false;
-            for (y = topLeft.Y; isEdge == false && y > 3; --y)
-                for (x = topLeft.X; x < topRight.X && isEdge == false; ++x)
+            for (y = m_topLeft.Y; isEdge == false && y > 3; --y)
+                for (x = m_topLeft.X; x < m_topRight.X && isEdge == false; ++x)
                 {
                     byteOffset = ((y * p_image.Width) + x) * 4;
 
@@ -138,13 +140,13 @@ namespace MotionGestureProcessing
                 }
             #endregion
 
-            topLeft.Y = y - 1;
-            topRight.Y = y - 2; //because the left will be 1 pixel higher than the right
+            m_topLeft.Y = y - 1;
+            m_topRight.Y = y - 2; //because the left will be 1 pixel higher than the right
 
             #region Expand Right
             isEdge = false;
-            for (x = topRight.X; isEdge == false && x < p_image.Width - 3; ++x)
-                for (y = topRight.Y; y < bottomRight.Y && isEdge == false; ++y)
+            for (x = m_topRight.X; isEdge == false && x < p_image.Width - 3; ++x)
+                for (y = m_topRight.Y; y < m_bottomRight.Y && isEdge == false; ++y)
                 {
                     byteOffset = ((y * p_image.Width) + x) * 4;
 
@@ -159,13 +161,13 @@ namespace MotionGestureProcessing
                 }
             #endregion
 
-            topRight.X = x - 1;
-            bottomRight.X = x - 2;
+            m_topRight.X = x - 1;
+            m_bottomRight.X = x - 2;
 
             #region Expand Down
             isEdge = false;
-            for (y = bottomLeft.Y; isEdge == false && y < p_image.Height - 3; ++y)
-                for (x = bottomLeft.X; x < bottomRight.X && isEdge == false; ++x)
+            for (y = m_bottomLeft.Y; isEdge == false && y < p_image.Height - 3; ++y)
+                for (x = m_bottomLeft.X; x < m_bottomRight.X && isEdge == false; ++x)
                 {
                     byteOffset = ((y * p_image.Width) + x) * 4;
 
@@ -180,15 +182,15 @@ namespace MotionGestureProcessing
                 }
             #endregion
 
-            bottomRight.Y = y - 1;
-            bottomLeft.Y = y - 2;
+            m_bottomRight.Y = y - 1;
+            m_bottomLeft.Y = y - 2;
 
             #region Expand Left
 
             isEdge = false;
-            for (x = topLeft.X; isEdge == false && x > 3; --x)
+            for (x = m_topLeft.X; isEdge == false && x > 3; --x)
             {
-                for (y = topLeft.Y; y < bottomLeft.Y && isEdge == false; ++y)
+                for (y = m_topLeft.Y; y < m_bottomLeft.Y && isEdge == false; ++y)
                 {
                     byteOffset = ((y * p_image.Width) + x) * 4;
 
@@ -205,8 +207,8 @@ namespace MotionGestureProcessing
 
             #endregion
 
-            topLeft.X = x - 1;
-            bottomLeft.X = x - 2;
+            m_topLeft.X = x - 1;
+            m_bottomLeft.X = x - 2;
 
             unlockBitmap(ref edgeBuffer, ref edgeData, ref p_edges);
             unlockBitmap(ref buffer, ref data, ref p_image);
@@ -217,7 +219,7 @@ namespace MotionGestureProcessing
         /// UPDATE: this now performs almost insantly instead of the 2 seconds it took before
         /// </summary>
         /// <param name="p_image"></param>
-        private void doWork(Image p_image)
+        private override void doWork(Object obj, Image p_image)
         {
             if (m_isInitialized)
             {              
@@ -276,6 +278,9 @@ namespace MotionGestureProcessing
                             dividedDoWorkARGB(buffer, data.Width / 2, data.Height / 2, data.Width, data.Height, data.Width);
                         });
                 #endregion
+
+                //Guasian cancelling
+
 
                 unlockBitmap(ref buffer, ref data, ref p_image);
 

@@ -58,12 +58,12 @@ namespace MotionGestureCapture
             Processing.ImageReadyHandler handler = null;
 
             //Sets the altered feed to the image if the altered feed is on screen
-            handler = (obj, image) =>
+            handler = (imgData) =>
             {   
                 if (tabControl1.SelectedIndex == 0)
-                    mainAlteredFeed.Image = image;
+                    mainAlteredFeed.Image = imgData.Image;
                 else
-                    testingPic.Image = image;
+                    testingPic.Image = imgData.Image;
             };
 
             m_processing.ReturnImageFilled += handler;
@@ -185,7 +185,7 @@ namespace MotionGestureCapture
 
                 //Add the stop functionality after grabbing an image
                 Processing.ImageReadyHandler handler = null;
-                handler = (obj, image) =>
+                handler = (imgData) =>
                 {
                     m_processing.ReturnImageFilled -= handler;
                     m_camCapture.stop();

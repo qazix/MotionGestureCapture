@@ -33,7 +33,7 @@ namespace MotionGestureProcessing
             Image edgeImage = new Bitmap(p_image);
             byte[] resultBuffer = new byte[edgeImage.Width * edgeImage.Height];
             byte[] pixelBuffer;
-            BitmapData data = Process.lockBitmap(out pixelBuffer, ref edgeImage);
+            BitmapData data = Process.lockBitmap(out pixelBuffer, edgeImage);
             convert2GreyScale(ref pixelBuffer);
 
             //step 1 blur image
@@ -41,39 +41,39 @@ namespace MotionGestureProcessing
 
             //TODO: comment this out and replace with this (pixelBuffer = resultBuffer;)
             //Check the images as I go strictly for testing
-            Process.unlockBitmap(ref resultBuffer, ref data, ref edgeImage);
+            Process.unlockBitmap(ref resultBuffer, ref data, edgeImage);
             //edgeImage.Save("FilteredImage.bmp");
-            data = Process.lockBitmap(out pixelBuffer, ref edgeImage);
+            data = Process.lockBitmap(out pixelBuffer, edgeImage);
 
             //step 2 apply sobel filters to find gradients
             float[,] angleMap = new float[edgeImage.Height, edgeImage.Width];
             findGradients(ref pixelBuffer, edgeImage.Width, ref resultBuffer, ref angleMap);
 
             //TODO: comment this out and replace with this (pixelBuffer = resultBuffer;)
-            Process.unlockBitmap(ref resultBuffer, ref data, ref edgeImage);
+            Process.unlockBitmap(ref resultBuffer, ref data, edgeImage);
             //edgeImage.Save("FilteredImage.bmp");
-            data = Process.lockBitmap(out pixelBuffer, ref edgeImage);
+            data = Process.lockBitmap(out pixelBuffer, edgeImage);
 
             //step 3 clear out all non local maximum values
             nonMaxSuppression(ref pixelBuffer, edgeImage.Width, ref resultBuffer, angleMap);
 
             //TODO: comment this out and replace with this (pixelBuffer = resultBuffer;)
-            Process.unlockBitmap(ref resultBuffer, ref data, ref edgeImage);
+            Process.unlockBitmap(ref resultBuffer, ref data, edgeImage);
             //edgeImage.Save("FilteredImage.bmp");
-            data = Process.lockBitmap(out pixelBuffer, ref edgeImage);
+            data = Process.lockBitmap(out pixelBuffer, edgeImage);
 
             //Step 4 dual edge thresholding
             thresholding(ref pixelBuffer, edgeImage.Width, ref resultBuffer);
 
             //thresholding doens't give a human recognizable output
-            Process.unlockBitmap(ref resultBuffer, ref data, ref edgeImage);
-            data = Process.lockBitmap(out pixelBuffer, ref edgeImage);
+            Process.unlockBitmap(ref resultBuffer, ref data, edgeImage);
+            data = Process.lockBitmap(out pixelBuffer, edgeImage);
 
             //Step 5 HysteresisThresholding
             hysterisisThresholding(ref pixelBuffer, edgeImage.Width, ref resultBuffer);
 
             //Restore byte array to image
-            Process.unlockBitmap(ref resultBuffer, ref data, ref edgeImage);
+            Process.unlockBitmap(ref resultBuffer, ref data, edgeImage);
             edgeImage.Save("Thresholding.bmp");
 
             return edgeImage;

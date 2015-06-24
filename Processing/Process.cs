@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 
 namespace MotionGestureProcessing
 {
-    class Process
+    abstract class Process
     {
         /// <summary>
         /// performs Bitmap.lockBits but does all the setup as well
@@ -17,7 +17,7 @@ namespace MotionGestureProcessing
         /// <param name="p_buffer">buffer to write out to</param>
         /// <param name="p_image">Image to write</param>
         /// <returns></returns>
-        public static BitmapData lockBitmap(out byte[] p_buffer, ref Image p_image)
+        public static BitmapData lockBitmap(out byte[] p_buffer, Image p_image)
         {
             //Setting up a buffer to be used for concurrent read/write
             int width = ((Bitmap)p_image).Width;
@@ -41,7 +41,7 @@ namespace MotionGestureProcessing
         /// <param name="p_buffer"></param>
         /// <param name="p_data"></param>
         /// <param name="p_image"></param>
-        public static void unlockBitmap(ref byte[] p_buffer, ref BitmapData p_data, ref Image p_image)
+        public static void unlockBitmap(ref byte[] p_buffer, ref BitmapData p_data, Image p_image)
         {
             //Copy it back and fill the image with the modified data
             Marshal.Copy(p_buffer, 0, p_data.Scan0, p_buffer.Length);
@@ -55,6 +55,6 @@ namespace MotionGestureProcessing
         /// </summary>
         /// <param name="obj">Data pertaining to this image</param>
         /// <param name="p_image">Image to be processed</param>
-        protected abstract void doWork(Object obj, Image p_image);
+        protected abstract void doWork(imageData p_imgData);
     }
 }

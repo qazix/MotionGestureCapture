@@ -26,6 +26,7 @@ namespace MotionGestureProcessing
         Point m_topRight;
         Point m_bottomLeft;
         Point m_bottomRight;
+        Rectangle m_filterArea;
 
         /// <summary>
         /// Empty constructor
@@ -37,19 +38,24 @@ namespace MotionGestureProcessing
         /// First populates the bit array for values then sets up the event listener
         /// </summary>
         /// <param name="p_toInit">The initialization frame</param>
-        public override void initialize(Image p_toInit)
+        public void initialize(imageData p_toInit)
         {
-            Image edges = ImageProcessing.findEdges(p_toInit);
+            Image toInit = p_toInit.Image;
+            Image edges = ImageProcessing.findEdges(toInit);
 
-            if (edges.PixelFormat != p_toInit.PixelFormat)
-                convert2PixelFormat(ref p_toInit);
+            if (edges.PixelFormat != toInit.PixelFormat)
+            {
+                convert2PixelFormat(ref toInit);
+                p_toInit.Image = toInit;
+            }
 
             m_isInitialized = false;
-            populateValidPixels(p_toInit, edges);
+            populateValidPixels(toInit, edges);
+            setupFilter();
             m_isInitialized = true;
             
             setupListener();
-            doWork(new imageData(true), p_toInit);
+            doWork(p_toInit);
         }
 
         private void convert2PixelFormat(ref Image p_toInit)
@@ -90,11 +96,11 @@ namespace MotionGestureProcessing
         /// <summary>
         /// Establishes a listening connection 
         /// </summary>
-        private override void setupListener()
+        protected override void setupListener()
         {
-            m_isoImageHandler = (obj, image) =>
+            m_isoImageHandler = (obj) =>
             {
-                this.doWork(obj, image);
+                this.doWork(obj);
             };
 
             Processing.getInstance().IsolationImageFilled += m_isoImageHandler;
@@ -111,8 +117,8 @@ namespace MotionGestureProcessing
             int byteOffset;
             bool isEdge;
 
-            BitmapData data = lockBitmap(out buffer, ref p_image);
-            BitmapData edgeData = lockBitmap(out edgeBuffer, ref p_edges);
+            BitmapData data = lockBitmap(out buffer, p_image);
+            BitmapData edgeData = lockBitmap(out edgeBuffer, p_edges);
 
             //Create the points
             m_topLeft = new Point((p_image.Width / 2) - 50, (p_image.Height / 2 - 50));
@@ -210,22 +216,31 @@ namespace MotionGestureProcessing
             m_topLeft.X = x - 1;
             m_bottomLeft.X = x - 2;
 
-            unlockBitmap(ref edgeBuffer, ref edgeData, ref p_edges);
-            unlockBitmap(ref buffer, ref data, ref p_image);
+            unlockBitmap(ref edgeBuffer, ref edgeData, p_edges);
+            unlockBitmap(ref buffer, ref data, p_image);
+        }
+
+        /// <summary>
+        /// This populates a filter to cancel out noise that isn't near the center
+        /// </summary>
+        private void setupFilter()
+        {
+            Size size = new Size((m_topRight.X - m_topLeft.X) * 4, (m_bottomLeft.Y - m_topLeft.Y) * 4);
+            m_filterArea = new Rectangle(m_topLeft, size);
         }
 
         /// <summary>
         /// this method transforms the image into a filtered image
         /// UPDATE: this now performs almost insantly instead of the 2 seconds it took before
         /// </summary>
-        /// <param name="p_image"></param>
-        private override void doWork(Object obj, Image p_image)
+        /// <param name="p_imageData"></param>
+        protected override void doWork(imageData p_imageData)
         {
             if (m_isInitialized)
             {              
                 //Setting up a buffer to be used for concurrent read/write
                 byte[] buffer;
-                BitmapData data = lockBitmap(out buffer, ref p_image);
+                BitmapData data = lockBitmap(out buffer, p_imageData.Image);
 
                 //This method returns bit per pixel, we need bytes.
                 int depth = Bitmap.GetPixelFormatSize(data.PixelFormat) / 8; 
@@ -280,11 +295,11 @@ namespace MotionGestureProcessing
                 #endregion
 
                 //Guasian cancelling
+                performCancelling(ref buffer, data, p_imageData);
 
+                unlockBitmap(ref buffer, ref data, p_imageData.Image);
 
-                unlockBitmap(ref buffer, ref data, ref p_image);
-
-                Processing.getInstance().ToPCAImage = p_image;
+                Processing.getInstance().ToPCAImage = p_imageData;
 
                 //If someone is listener raise an event
                 if (ProcessReady != null)
@@ -354,6 +369,73 @@ namespace MotionGestureProcessing
                         p_buffer[offset + 3] = 255;
                     }
                 }
+        }
+
+        /// <summary>
+        /// Cancels out the pixels that aren't near the hand
+        /// </summary>
+        /// <param name="p_buffer"></param>
+        /// <param name="p_data"></param>
+        /// <param name="obj">imageData</param>
+        private void performCancelling(ref byte[] p_buffer, BitmapData p_data, Object obj)
+        {
+            Point filterCenter = ((imageData)obj).Center;
+            filterCenter.X += p_data.Width / 2;
+            filterCenter.Y = (p_data.Height / 2) - filterCenter.Y;
+
+            //Get the bounds of the rectangle centered around the center given by the obj
+            Point topLeft = new Point(filterCenter.X - (m_filterArea.Width / 2), 
+                                      filterCenter.Y - (m_filterArea.Height / 2));
+            Point bottomRight = new Point(filterCenter.X + (m_filterArea.Width / 2),
+                                          filterCenter.Y + (m_filterArea.Height / 2));
+
+            int byteOffset = 0;
+
+            //Iterate through each column
+            for (int y = 0; y < p_data.Height; ++y)
+            {
+                //If the box is within this row
+                if (y >= topLeft.Y && y <= bottomRight.Y)
+                {
+                    byteOffset = y * p_data.Stride;
+                    int x = 0;
+                    //clear everything to the left of the box
+                    while (x < topLeft.X)
+                    {
+                        p_buffer[(x * 4) + byteOffset + 2] = p_buffer[(x * 4) + byteOffset + 1] =
+                            p_buffer[(x * 4) + byteOffset] = 0;
+                        p_buffer[(x * 4) + byteOffset + 3] = 255;
+                        ++x;
+                    }
+
+                    //do nothing to the values in the box
+                    while (x < bottomRight.X)
+                        ++x;
+
+                    //clear everything to the right of the box
+                    while(x < p_data.Width)
+                    {
+                        p_buffer[(x * 4) + byteOffset + 2] = p_buffer[(x * 4) + byteOffset + 1] =
+                            p_buffer[(x * 4) + byteOffset] = 0;
+                        p_buffer[(x * 4) + byteOffset + 3] = 255;
+                        ++x;
+                    }
+                }
+
+                else 
+                {
+                    //clear the entire row
+                    byteOffset = y * p_data.Stride;
+                    for (int x = 0; x < p_data.Stride; x += 4)
+                    {
+                        p_buffer[x + byteOffset + 2] = p_buffer[x + byteOffset + 1] =
+                            p_buffer[x + byteOffset] = 0;
+                        p_buffer[x + byteOffset + 3] = 255;
+                    }
+                }
+
+                
+            }
         }
     }
 }

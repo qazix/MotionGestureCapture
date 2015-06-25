@@ -42,7 +42,7 @@ namespace MotionGestureProcessing
             //TODO: comment this out and replace with this (pixelBuffer = resultBuffer;)
             //Check the images as I go strictly for testing
             Process.unlockBitmap(ref resultBuffer, ref data, edgeImage);
-            //edgeImage.Save("FilteredImage.bmp");
+            edgeImage.Save("SmoothedImage.bmp");
             data = Process.lockBitmap(out pixelBuffer, edgeImage);
 
             //step 2 apply sobel filters to find gradients
@@ -51,7 +51,7 @@ namespace MotionGestureProcessing
 
             //TODO: comment this out and replace with this (pixelBuffer = resultBuffer;)
             Process.unlockBitmap(ref resultBuffer, ref data, edgeImage);
-            //edgeImage.Save("FilteredImage.bmp");
+            edgeImage.Save("FilteredImage.bmp");
             data = Process.lockBitmap(out pixelBuffer, edgeImage);
 
             //step 3 clear out all non local maximum values
@@ -59,7 +59,7 @@ namespace MotionGestureProcessing
 
             //TODO: comment this out and replace with this (pixelBuffer = resultBuffer;)
             Process.unlockBitmap(ref resultBuffer, ref data, edgeImage);
-            //edgeImage.Save("FilteredImage.bmp");
+            edgeImage.Save("NonMaxSupressImage.bmp");
             data = Process.lockBitmap(out pixelBuffer, edgeImage);
 
             //Step 4 dual edge thresholding
@@ -90,9 +90,13 @@ namespace MotionGestureProcessing
             for (int i = 0; i < pixelBuffer.Length; i += 4)
             {
                 //grey scale transform is .2R + .59G + .11B
-                rgb = pixelBuffer[i] * 0.11f;
+                /*rgb = pixelBuffer[i] * 0.11f;
                 rgb += pixelBuffer[i + 1] * 0.59f;
-                rgb += pixelBuffer[i + 2] * .2f;
+                rgb += pixelBuffer[i + 2] * .2f;*/
+
+                rgb = pixelBuffer[i] * 0.3f;
+                rgb += pixelBuffer[i + 1] * 0.3f;
+                rgb += pixelBuffer[i + 2] * .3f;
 
                 pixelBuffer[i] = pixelBuffer[i + 1] = pixelBuffer[i + 2] = (byte)rgb;
                 pixelBuffer[i + 3] = 255;

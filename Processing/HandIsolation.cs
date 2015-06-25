@@ -43,6 +43,7 @@ namespace MotionGestureProcessing
             Image toInit = p_toInit.Image;
             Image edges = ImageProcessing.findEdges(toInit);
 
+            //Convert if edges size doesn't match given image size
             if (edges.PixelFormat != toInit.PixelFormat)
             {
                 convert2PixelFormat(ref toInit);
@@ -58,6 +59,11 @@ namespace MotionGestureProcessing
             doWork(p_toInit);
         }
 
+        /// <summary>
+        /// This is used because edges is done in 32bpp and most cameras are only 24bpp
+        /// So i must convert the pixel format for easy comparison
+        /// </summary>
+        /// <param name="p_toInit">image to convert</param>
         private void convert2PixelFormat(ref Image p_toInit)
         {
             Bitmap converted = new Bitmap(p_toInit);
@@ -170,6 +176,7 @@ namespace MotionGestureProcessing
             m_topRight.X = x - 1;
             m_bottomRight.X = x - 2;
 
+            /* Expanding down i troublesome becuase of shadow edges
             #region Expand Down
             isEdge = false;
             for (y = m_bottomLeft.Y; isEdge == false && y < p_image.Height - 3; ++y)
@@ -190,7 +197,7 @@ namespace MotionGestureProcessing
 
             m_bottomRight.Y = y - 1;
             m_bottomLeft.Y = y - 2;
-
+            */
             #region Expand Left
 
             isEdge = false;
@@ -294,9 +301,17 @@ namespace MotionGestureProcessing
                         });
                 #endregion
 
-                //Guasian cancelling
-                performCancelling(ref buffer, data, p_imageData);
+                p_imageData.Datapoints = getDataPoints(buffer, data);
+                //findHand(p_imageData, data);
 
+                //Guasian cancelling
+                //I need to update the center posisiton before cancelling this out
+                /*
+                if (depth == 3)
+                    performCancellingRGB(ref buffer, data, p_imageData);
+                else
+                    performCancellingARGB(ref buffer, data, p_imageData);
+                */
                 unlockBitmap(ref buffer, ref data, p_imageData.Image);
 
                 Processing.getInstance().ToPCAImage = p_imageData;
@@ -305,6 +320,92 @@ namespace MotionGestureProcessing
                 if (ProcessReady != null)
                     ProcessReady();
             }
+        }
+
+        private void findHand(imageData p_imageData, BitmapData p_data)
+        {
+            Point handCenter = p_imageData.Center;
+            handCenter.X += p_data.Width / 2;
+            handCenter.Y = (p_data.Height / 2) - handCenter.Y;
+
+            int[] xProjection = new int[p_data.Width];
+            int[] yProjection = new int[p_data.Height];
+
+            //Popluate histogram for x and y intesities
+            foreach (List<int> point in p_imageData.Datapoints)
+            {
+                ++xProjection[point[0]];
+                ++yProjection[point[1]];
+            }
+
+            #region find maxima nearest to previous center
+            int xLeftMax, xRightMax;
+            xLeftMax = xRightMax = handCenter.X;
+            int yTopMax, yBottomMax;
+            yTopMax = yBottomMax = handCenter.Y;
+            
+            Parallel.Invoke(
+                () =>
+                {
+                    //topMax
+                    findMax(ref yTopMax, yProjection, -1);
+                },
+                () =>
+                {
+                    findMax(ref yBottomMax, yProjection, 1);
+                },
+                () =>
+                {
+                    findMax(ref xLeftMax, xProjection, -1);
+                },
+                () =>
+                {
+                    findMax(ref xRightMax, xProjection, 1);
+                });
+            #endregion
+
+
+
+            Point topLeft = new Point(handCenter.X - (m_filterArea.Width / 2),
+                                      handCenter.Y - (m_filterArea.Height / 2));
+            Point bottomRight = new Point(handCenter.X + (m_filterArea.Width / 2),
+                                          handCenter.Y + (m_filterArea.Height / 2)); 
+        }
+
+        private void findMax(ref int p_start, int[] p_searchSpace, int p_inc)
+        {
+            int max = p_searchSpace[p_start];
+            //While I haven't found the max and not off the array
+            while (p_searchSpace[p_start + p_inc] >= max && (p_start > 0 && p_start < p_searchSpace.Length))
+                p_start += p_inc;
+        }
+
+        /// <summary>
+        /// This converts the image data into data points with x and y coordinates.
+        /// I'm using a list becuase this should be a sparse dataset.
+        /// </summary>
+        /// <param name="p_buffer">image as bytes</param>
+        /// <param name="p_data">BitmapData</param>
+        /// <returns>list of (x, y) tuples</returns>
+        private List<List<int>> getDataPoints(byte[] p_buffer, BitmapData p_data)
+        {
+            int x, y;
+            int depth = p_data.Stride / p_data.Width;
+            List<List<int>> dataPoints = new List<List<int>>();
+
+            //I am iterating this way instead of with a double for loop with x and y because
+            // this should be a sparse matrix
+            for (int offset = 0; offset < p_buffer.Length; offset += depth)
+            {
+                if (p_buffer[offset] > 0)
+                {
+                    y = offset / p_data.Stride;
+                    x = (offset % p_data.Stride) / depth;
+                    dataPoints.Add(new List<int>() { x, y });
+                }
+            }
+
+            return dataPoints;
         }
 
         /// <summary>
@@ -377,7 +478,71 @@ namespace MotionGestureProcessing
         /// <param name="p_buffer"></param>
         /// <param name="p_data"></param>
         /// <param name="obj">imageData</param>
-        private void performCancelling(ref byte[] p_buffer, BitmapData p_data, Object obj)
+        private void performCancellingRGB(ref byte[] p_buffer, BitmapData p_data, imageData p_imageData)
+        {
+            Point filterCenter = p_imageData.Center;
+            filterCenter.X += p_data.Width / 2;
+            filterCenter.Y = (p_data.Height / 2) - filterCenter.Y;
+
+            //Get the bounds of the rectangle centered around the center given by the obj
+            Point topLeft = new Point(filterCenter.X - (m_filterArea.Width / 2),
+                                      filterCenter.Y - (m_filterArea.Height / 2));
+            Point bottomRight = new Point(filterCenter.X + (m_filterArea.Width / 2),
+                                          filterCenter.Y + (m_filterArea.Height / 2)); 
+            int byteOffset = 0;
+
+            //Iterate through each column
+            for (int y = 0; y < p_data.Height; ++y)
+            {
+                //If the box is within this row
+                if (y >= topLeft.Y && y <= bottomRight.Y)
+                {
+                    byteOffset = y * p_data.Stride;
+                    int x = 0;
+                    int xOffset;
+                    //clear everything to the left of the box
+                    while (x < topLeft.X)
+                    {
+                        xOffset = x * 3;
+                        p_buffer[xOffset + byteOffset + 2] = p_buffer[xOffset + byteOffset + 1] =
+                            p_buffer[xOffset + byteOffset] = 0;
+                        ++x;
+                    }
+
+                    //do nothing to the values in the box
+                    while (x < bottomRight.X)
+                        ++x;
+
+                    //clear everything to the right of the box
+                    while (x < p_data.Width)
+                    {
+                        xOffset = x * 3;
+                        p_buffer[xOffset + byteOffset + 2] = p_buffer[xOffset + byteOffset + 1] =
+                            p_buffer[xOffset + byteOffset] = 0;
+                        ++x;
+                    }
+                }
+
+                else
+                {
+                    //clear the entire row
+                    byteOffset = y * p_data.Stride;
+                    for (int x = 0; x < p_data.Stride; x += 3)
+                    {
+                        p_buffer[x + byteOffset + 2] = p_buffer[x + byteOffset + 1] =
+                            p_buffer[x + byteOffset] = 0;
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Cancels out the pixels that aren't near the hand
+        /// </summary>
+        /// <param name="p_buffer"></param>
+        /// <param name="p_data"></param>
+        /// <param name="obj">imageData</param>
+        private void performCancellingARGB(ref byte[] p_buffer, BitmapData p_data, Object obj)
         {
             Point filterCenter = ((imageData)obj).Center;
             filterCenter.X += p_data.Width / 2;
@@ -399,12 +564,14 @@ namespace MotionGestureProcessing
                 {
                     byteOffset = y * p_data.Stride;
                     int x = 0;
+                    int xOffset;
                     //clear everything to the left of the box
                     while (x < topLeft.X)
                     {
-                        p_buffer[(x * 4) + byteOffset + 2] = p_buffer[(x * 4) + byteOffset + 1] =
-                            p_buffer[(x * 4) + byteOffset] = 0;
-                        p_buffer[(x * 4) + byteOffset + 3] = 255;
+                        xOffset = x * 4;
+                        p_buffer[xOffset + byteOffset + 2] = p_buffer[xOffset + byteOffset + 1] =
+                            p_buffer[xOffset + byteOffset] = 0;
+                        p_buffer[xOffset + byteOffset + 3] = 255;
                         ++x;
                     }
 
@@ -413,11 +580,12 @@ namespace MotionGestureProcessing
                         ++x;
 
                     //clear everything to the right of the box
-                    while(x < p_data.Width)
+                    while (x < p_data.Width)
                     {
-                        p_buffer[(x * 4) + byteOffset + 2] = p_buffer[(x * 4) + byteOffset + 1] =
-                            p_buffer[(x * 4) + byteOffset] = 0;
-                        p_buffer[(x * 4) + byteOffset + 3] = 255;
+                        xOffset = x * 4;
+                        p_buffer[xOffset + byteOffset + 2] = p_buffer[xOffset + byteOffset + 1] =
+                            p_buffer[xOffset + byteOffset] = 0;
+                        p_buffer[xOffset + byteOffset + 3] = 255;
                         ++x;
                     }
                 }
@@ -433,8 +601,6 @@ namespace MotionGestureProcessing
                         p_buffer[x + byteOffset + 3] = 255;
                     }
                 }
-
-                
             }
         }
     }

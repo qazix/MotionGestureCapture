@@ -11,6 +11,8 @@ namespace MotionGestureProcessing
     {
         public bool InitialFrame { get; set; }
         public Image Image { get; set; }
+        public List<List<int>> Datapoints { get; set; }
+        public Rectangle Filter { get; set; }
         public Point Center { get; set; }
         public float PC1 { get; set; }
         public float PC2 { get; set; }

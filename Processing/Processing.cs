@@ -24,10 +24,9 @@ namespace MotionGestureProcessing
         private HandIsolation.ProcessReadyHandler m_HIHandler;
 
         public bool IsInitialized { get; set; }
-        public Semaphore CamToIsolation { get; set; }
         public Semaphore IsolationToPCA { get; set; }
         public Semaphore PCAToGestures { get; set; }
-        public Semaphore GesturesToReturn { get; set; }
+        public Mutex feedBackData { get; set; }
 
         private imageData m_toIsolationImage;
 
@@ -35,12 +34,20 @@ namespace MotionGestureProcessing
             set{
                 m_toIsolationImage = value;
                 if (IsolationImageFilled != null)
+                {
                     IsolationImageFilled(value);
+                }
             }
         }
-        public imageData ToPCAImage { set { ToReturnImage = value; } }
+        public imageData ToPCAImage { 
+            set {
+                IsolationToPCA.WaitOne();
+                ToReturnImage = value; 
+            }
+        }
         public imageData ToGesturesImage { get; set; }
         public imageData ToReturnImage { set{
+                IsolationToPCA.Release();
                 ReturnImageFilled(value);
             } 
         }
@@ -52,10 +59,9 @@ namespace MotionGestureProcessing
         private Processing()
         {
             m_camCapture = CamCapture.getInstance();
-            CamToIsolation   = new Semaphore(1, 1);
             IsolationToPCA   = new Semaphore(1, 1);
             PCAToGestures    = new Semaphore(1, 1);
-            GesturesToReturn = new Semaphore(1, 1);
+            feedBackData     = new Mutex();
 
             m_handIso = new HandIsolation();
         }

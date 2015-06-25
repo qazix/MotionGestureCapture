@@ -21,6 +21,7 @@ namespace MotionGestureProcessing
         private Processing.ImageReadyHandler m_isoImageHandler;
         private static HashSet<int> m_validPixels;
         private static bool m_isInitialized;
+        private static Point m_center;
 
         Point m_topLeft;
         Point m_topRight;
@@ -53,6 +54,7 @@ namespace MotionGestureProcessing
             m_isInitialized = false;
             populateValidPixels(toInit, edges);
             setupFilter();
+            m_center = new Point(0, 0);
             m_isInitialized = true;
             
             setupListener();
@@ -106,7 +108,9 @@ namespace MotionGestureProcessing
         {
             m_isoImageHandler = (obj) =>
             {
-                this.doWork(obj);
+                //Thread t = new Thread(new ParameterizedThreadStart(doWork));
+                //t.Start(obj);
+                doWork(obj);
             };
 
             Processing.getInstance().IsolationImageFilled += m_isoImageHandler;
@@ -241,13 +245,13 @@ namespace MotionGestureProcessing
         /// UPDATE: this now performs almost insantly instead of the 2 seconds it took before
         /// </summary>
         /// <param name="p_imageData"></param>
-        protected override void doWork(imageData p_imageData)
+        protected override void doWork(Object p_imageData)
         {
             if (m_isInitialized)
             {              
                 //Setting up a buffer to be used for concurrent read/write
                 byte[] buffer;
-                BitmapData data = lockBitmap(out buffer, p_imageData.Image);
+                BitmapData data = lockBitmap(out buffer, ((imageData)p_imageData).Image);
 
                 //This method returns bit per pixel, we need bytes.
                 int depth = Bitmap.GetPixelFormatSize(data.PixelFormat) / 8; 
@@ -301,7 +305,7 @@ namespace MotionGestureProcessing
                         });
                 #endregion
 
-                p_imageData.Datapoints = getDataPoints(buffer, data);
+                ((imageData)p_imageData).Datapoints = getDataPoints(buffer, data);
                 //findHand(p_imageData, data);
 
                 //Guasian cancelling
@@ -312,9 +316,9 @@ namespace MotionGestureProcessing
                 else
                     performCancellingARGB(ref buffer, data, p_imageData);
                 */
-                unlockBitmap(ref buffer, ref data, p_imageData.Image);
+                unlockBitmap(ref buffer, ref data, ((imageData)p_imageData).Image);
 
-                Processing.getInstance().ToPCAImage = p_imageData;
+                Processing.getInstance().ToPCAImage = (imageData)p_imageData;
 
                 //If someone is listener raise an event
                 if (ProcessReady != null)
@@ -324,7 +328,7 @@ namespace MotionGestureProcessing
 
         private void findHand(imageData p_imageData, BitmapData p_data)
         {
-            Point handCenter = p_imageData.Center;
+            Point handCenter = m_center;
             handCenter.X += p_data.Width / 2;
             handCenter.Y = (p_data.Height / 2) - handCenter.Y;
 
@@ -480,7 +484,7 @@ namespace MotionGestureProcessing
         /// <param name="obj">imageData</param>
         private void performCancellingRGB(ref byte[] p_buffer, BitmapData p_data, imageData p_imageData)
         {
-            Point filterCenter = p_imageData.Center;
+            Point filterCenter = m_center;
             filterCenter.X += p_data.Width / 2;
             filterCenter.Y = (p_data.Height / 2) - filterCenter.Y;
 
@@ -544,7 +548,7 @@ namespace MotionGestureProcessing
         /// <param name="obj">imageData</param>
         private void performCancellingARGB(ref byte[] p_buffer, BitmapData p_data, Object obj)
         {
-            Point filterCenter = ((imageData)obj).Center;
+            Point filterCenter = m_center;
             filterCenter.X += p_data.Width / 2;
             filterCenter.Y = (p_data.Height / 2) - filterCenter.Y;
 

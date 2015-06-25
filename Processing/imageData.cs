@@ -13,14 +13,12 @@ namespace MotionGestureProcessing
         public Image Image { get; set; }
         public List<List<int>> Datapoints { get; set; }
         public Rectangle Filter { get; set; }
-        public Point Center { get; set; }
         public float PC1 { get; set; }
         public float PC2 { get; set; }
 
         public imageData(bool p_isInit, Image p_image)
         {
-            InitialFrame = true;
-            Center = new Point(0, 0);
+            InitialFrame = p_isInit;
             Image = p_image;
         }
     }

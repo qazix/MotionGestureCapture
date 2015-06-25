@@ -55,6 +55,6 @@ namespace MotionGestureProcessing
         /// </summary>
         /// <param name="obj">Data pertaining to this image</param>
         /// <param name="p_image">Image to be processed</param>
-        protected abstract void doWork(imageData p_imgData);
+        protected abstract void doWork(Object p_imgData);
     }
 }

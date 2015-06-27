@@ -172,17 +172,17 @@ namespace MotionGestureProcessing
         /// <returns></returns>
         private static int generateGausianKernel(int p_sizeOfKernel, float p_sigma, out int[,] p_gKernel)
         {
-            float pi = (float)Math.PI;
+            double pi = (double)Math.PI;
 
             //kernel is temporary to find precise 
-            float[,] kernel = new float[p_sizeOfKernel, p_sizeOfKernel];
+            double[,] kernel = new double[p_sizeOfKernel, p_sizeOfKernel];
             p_gKernel = new int[p_sizeOfKernel, p_sizeOfKernel];
 
-            float D2 = p_sigma * p_sigma * 2;
-            float D1 = 1 / (pi * D2);
+            double D2 = p_sigma * p_sigma * 2;
+            double D1 = 1 / (pi * D2);
 
             int sum, mult;
-            float min = 1000; //initialize min to something large
+            double min = 1000; //initialize min to something large
             int upper = p_sizeOfKernel / 2;
             int lower = -upper;
 
@@ -190,7 +190,7 @@ namespace MotionGestureProcessing
             for (int i = lower; i <= upper; ++i)
                 for (int j = lower; j <= upper; ++j)
                 {
-                    kernel[upper + i, upper + j] = ((1 / D1) * (float)Math.Exp(
+                    kernel[upper + i, upper + j] = ((1 / D1) * (double)Math.Exp(
                                                           -(i * i + j * j) / D2));
                     if (kernel[upper + i, upper + j] < min)
                         min = kernel[upper + i, upper + j];

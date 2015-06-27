@@ -54,7 +54,7 @@ namespace MotionGestureProcessing
             m_isInitialized = false;
             populateValidPixels(toInit, edges);
             setupFilter();
-            m_center = new Point(0, 0);
+            m_center = new Point(toInit.Width / 2, toInit.Height / 2);
             m_isInitialized = true;
             
             setupListener();
@@ -236,7 +236,8 @@ namespace MotionGestureProcessing
         /// </summary>
         private void setupFilter()
         {
-            Size size = new Size((m_topRight.X - m_topLeft.X) * 4, (m_bottomLeft.Y - m_topLeft.Y) * 4);
+            int max = Math.Max((m_topRight.X - m_topLeft.X) * 4, (m_bottomLeft.Y - m_topLeft.Y) * 4);
+            Size size = new Size(max, max);
             m_filterArea = new Rectangle(m_topLeft, size);
         }
 
@@ -248,7 +249,9 @@ namespace MotionGestureProcessing
         protected override void doWork(Object p_imageData)
         {
             if (m_isInitialized)
-            {              
+            {
+
+
                 //Setting up a buffer to be used for concurrent read/write
                 byte[] buffer;
                 BitmapData data = lockBitmap(out buffer, ((imageData)p_imageData).Image);
@@ -306,16 +309,16 @@ namespace MotionGestureProcessing
                 #endregion
 
                 ((imageData)p_imageData).Datapoints = getDataPoints(buffer, data);
-                //findHand(p_imageData, data);
+
+                findHand((imageData)p_imageData, data, buffer);
+                drawCenter(buffer, data);
 
                 //Guasian cancelling
-                //I need to update the center posisiton before cancelling this out
-                /*
                 if (depth == 3)
-                    performCancellingRGB(ref buffer, data, p_imageData);
+                    performCancellingRGB(ref buffer, data);
                 else
-                    performCancellingARGB(ref buffer, data, p_imageData);
-                */
+                    performCancellingARGB(ref buffer, data);
+                
                 unlockBitmap(ref buffer, ref data, ((imageData)p_imageData).Image);
 
                 Processing.getInstance().ToPCAImage = (imageData)p_imageData;
@@ -326,62 +329,210 @@ namespace MotionGestureProcessing
             }
         }
 
-        private void findHand(imageData p_imageData, BitmapData p_data)
+        /// <summary>
+        /// draws the center of the hand 
+        /// FOR TESTING
+        /// </summary>
+        /// <param name="p_buffer"></param>
+        /// <param name="p_data"></param>
+        private void drawCenter(byte[] p_buffer, BitmapData p_data)
+        {
+            int depth = p_data.Stride / p_data.Width;
+            int offset = m_center.X * depth;
+            for (int y = 0; y < p_data.Height; ++y)
+            {
+                if (y != m_center.Y)
+                {
+                    p_buffer[offset] = p_buffer[offset + 2] = 0;
+                    p_buffer[offset + 1] = 255;
+                }
+                else
+                {
+                    offset = (y * p_data.Stride);
+                    for (int x = 0; x < p_data.Stride; x += depth)
+                    {
+                        p_buffer[offset + x] = p_buffer[offset + x + 2] = 0;
+                        p_buffer[offset + x + 1] = 255;
+                    }
+                    offset += m_center.X * depth;
+                }
+                offset += p_data.Stride;
+            }
+        }
+
+        /// <summary>
+        /// Uses inner to outer search to find a strong feature then
+        /// scans from outside to in of a more reduced area to find a more accurate center
+        /// </summary>
+        /// <param name="p_imageData">Image data</param>
+        /// <param name="p_data">bitmap data</param>
+        /// <param name="p_buffer">used for testing</param>
+        private void findHand(imageData p_imageData, BitmapData p_data, byte[] p_buffer)
         {
             Point handCenter = m_center;
-            handCenter.X += p_data.Width / 2;
-            handCenter.Y = (p_data.Height / 2) - handCenter.Y;
 
             int[] xProjection = new int[p_data.Width];
             int[] yProjection = new int[p_data.Height];
+            int[] xSmoothed = new int[p_data.Width];
+            int[] ySmoothed = new int[p_data.Height];
 
             //Popluate histogram for x and y intesities
-            foreach (List<int> point in p_imageData.Datapoints)
+            foreach (Point point in p_imageData.Datapoints)
             {
-                ++xProjection[point[0]];
-                ++yProjection[point[1]];
+                ++xProjection[point.X];
+                ++yProjection[point.Y];
             }
 
-            #region find maxima nearest to previous center
-            int xLeftMax, xRightMax;
-            xLeftMax = xRightMax = handCenter.X;
-            int yTopMax, yBottomMax;
-            yTopMax = yBottomMax = handCenter.Y;
+            #region Smoothing
+            smoothing(ref xProjection, ref xSmoothed);
+            smoothing(ref yProjection, ref ySmoothed);
+            #endregion
+
+            #region find bounds around the previous center
+            // work from the center out.  This will help ignore outside noise.
+            //The bounds represent strong points in the histogram
+            int xLeftBound, xRightBound;
+            xLeftBound = xRightBound = handCenter.X;
+            int yTopBound, yBottomBound;
+            yTopBound = yBottomBound = handCenter.Y;
             
             Parallel.Invoke(
                 () =>
                 {
-                    //topMax
-                    findMax(ref yTopMax, yProjection, -1);
+                    findBound(ref yTopBound, ySmoothed, -1, m_filterArea.Width / 4, true);
                 },
                 () =>
                 {
-                    findMax(ref yBottomMax, yProjection, 1);
+                    findBound(ref yBottomBound, ySmoothed, 1, m_filterArea.Width / 4, true);
                 },
                 () =>
                 {
-                    findMax(ref xLeftMax, xProjection, -1);
+                    findBound(ref xLeftBound, xSmoothed, -1, m_filterArea.Height / 4, true);
                 },
                 () =>
                 {
-                    findMax(ref xRightMax, xProjection, 1);
+                    findBound(ref xRightBound, xSmoothed, 1, m_filterArea.Height / 4, true);
                 });
             #endregion
 
+            #region Second pass
+            Point closest = new Point();
 
+            //Save the center from first pass as this will be the start of the second
+            closest.X = (xLeftBound + xRightBound) / 2;
+            closest.Y = (yTopBound + yBottomBound) / 2;
 
-            Point topLeft = new Point(handCenter.X - (m_filterArea.Width / 2),
-                                      handCenter.Y - (m_filterArea.Height / 2));
-            Point bottomRight = new Point(handCenter.X + (m_filterArea.Width / 2),
-                                          handCenter.Y + (m_filterArea.Height / 2)); 
+            //Rectangles X and Y are based on the tip right so adjustment is necesary
+            m_filterArea.X = closest.X - m_filterArea.Width / 2;
+            m_filterArea.Y = closest.Y - m_filterArea.Height / 2;
+
+            /*
+            m_center = new Point((m_filterArea.X >= 0 ? m_filterArea.X : 0),
+                                 (m_filterArea.Y >= 0 ? m_filterArea.Y : 0));
+            drawCenter(p_buffer, p_data);
+            m_center = new Point((m_filterArea.X + m_filterArea.Width <= p_data.Width ? m_filterArea.X + m_filterArea.Width : p_data.Width),
+                                 (m_filterArea.Y + m_filterArea.Height < p_data.Height ? m_filterArea.Y + m_filterArea.Height : p_data.Height - 1));
+            drawCenter(p_buffer, p_data);
+            */
+
+            //Create a smaller window
+            xProjection = new int[m_filterArea.Width];
+            yProjection = new int[m_filterArea.Height];
+            xSmoothed = new int[m_filterArea.Width];
+            ySmoothed = new int[m_filterArea.Height];
+
+            //Populate it with only data points that are within the rectangle
+            foreach (Point point in p_imageData.Datapoints)
+            {
+                if (m_filterArea.Contains(point))
+                {
+                    ++xProjection[point.X - m_filterArea.X];
+                    ++yProjection[point.Y - m_filterArea.Y];
+                }
+            }
+
+            //Smooth it out before the finding the center
+            smoothing(ref xProjection, ref xSmoothed);
+            smoothing(ref yProjection, ref ySmoothed);
+            #endregion
+
+            #region find bounds around the first center
+            //This second pass will work over a reduced area so I work from the outside
+            // of the rectangle in , not worrying about noise
+            xLeftBound = xRightBound = closest.X - m_filterArea.X;
+            yTopBound = xLeftBound = 1;
+            yBottomBound = m_filterArea.Height - 2;
+            xRightBound = m_filterArea.Width - 2;
+
+            Parallel.Invoke(
+                () =>
+                {
+                    findBound(ref yTopBound, ySmoothed, 1, m_filterArea.Width / 8, false);
+                },
+                () =>
+                {
+                    findBound(ref yBottomBound, ySmoothed, -1, m_filterArea.Width / 8, false);
+                },
+                () =>
+                {
+                    findBound(ref xLeftBound, xSmoothed, 1, m_filterArea.Height / 8, false);
+                },
+                () =>
+                {
+                    findBound(ref xRightBound, xSmoothed, -1, m_filterArea.Height / 8, false);
+                });
+            #endregion
+            closest.X = ((xLeftBound + xRightBound) / 2) + m_filterArea.X;
+            closest.Y = ((yTopBound + yBottomBound) / 2) + m_filterArea.Y;
+
+            //Update center and filter
+            m_center = new Point(closest.X, closest.Y);
+            m_filterArea.X = m_center.X - m_filterArea.Width / 2;
+            m_filterArea.Y = m_center.Y - m_filterArea.Height / 2;
         }
 
-        private void findMax(ref int p_start, int[] p_searchSpace, int p_inc)
+        /// <summary>
+        /// Find bounds of a threshold
+        /// </summary>
+        /// <param name="p_start">starting index</param>
+        /// <param name="p_searchSpace">histogram</param>
+        /// <param name="p_inc">diretion of traversal</param>
+        /// <param name="p_thresh">threshold</param>
+        private void findBound(ref int p_start, int[] p_searchSpace, int p_inc, int p_thresh, bool greaterThan)
         {
-            int max = p_searchSpace[p_start];
-            //While I haven't found the max and not off the array
-            while (p_searchSpace[p_start + p_inc] >= max && (p_start > 0 && p_start < p_searchSpace.Length))
-                p_start += p_inc;
+            if (greaterThan)
+                while ((p_start > 1 && p_start < p_searchSpace.Length - 1) && p_searchSpace[p_start + p_inc] >= p_thresh)
+                    p_start += p_inc;
+            else
+                while ((p_start > 0 && p_start < p_searchSpace.Length - 1) && p_searchSpace[p_start + p_inc] < p_thresh)
+                    p_start += p_inc;
+
+            if ((p_inc > 0 && p_start > p_searchSpace.Length - 2) ||
+                (p_inc < 0 && p_start < 3))
+            {
+                p_start = p_searchSpace.Length / 2;
+            }                
+        }
+
+        /// <summary>
+        /// Smooth a histogram
+        /// </summary>
+        /// <param name="p_searchSpace">initial histogram</param>
+        /// <param name="p_smoothSpace">smoothed histogram</param>
+        private void smoothing(ref int[] p_searchSpace, ref int[] p_smoothSpace)
+        {
+            int sum;
+            int smoothingSize = 11; // must be odd
+            int limit = smoothingSize / 2;
+            for (int i = limit; i < p_searchSpace.Length - limit; ++i)
+            {
+                sum = 0;
+                for (int j = -limit; j <= limit; ++j)
+                {
+                    sum += p_searchSpace[i + j];
+                }
+                p_smoothSpace[i] = sum / smoothingSize;
+            }
         }
 
         /// <summary>
@@ -391,11 +542,11 @@ namespace MotionGestureProcessing
         /// <param name="p_buffer">image as bytes</param>
         /// <param name="p_data">BitmapData</param>
         /// <returns>list of (x, y) tuples</returns>
-        private List<List<int>> getDataPoints(byte[] p_buffer, BitmapData p_data)
+        private List<Point> getDataPoints(byte[] p_buffer, BitmapData p_data)
         {
             int x, y;
             int depth = p_data.Stride / p_data.Width;
-            List<List<int>> dataPoints = new List<List<int>>();
+            List<Point> dataPoints = new List<Point>();
 
             //I am iterating this way instead of with a double for loop with x and y because
             // this should be a sparse matrix
@@ -405,7 +556,7 @@ namespace MotionGestureProcessing
                 {
                     y = offset / p_data.Stride;
                     x = (offset % p_data.Stride) / depth;
-                    dataPoints.Add(new List<int>() { x, y });
+                    dataPoints.Add(new Point(x, y));
                 }
             }
 
@@ -479,20 +630,15 @@ namespace MotionGestureProcessing
         /// <summary>
         /// Cancels out the pixels that aren't near the hand
         /// </summary>
-        /// <param name="p_buffer"></param>
-        /// <param name="p_data"></param>
-        /// <param name="obj">imageData</param>
-        private void performCancellingRGB(ref byte[] p_buffer, BitmapData p_data, imageData p_imageData)
+        /// <param name="p_buffer">image buffer</param>
+        /// <param name="p_data">bitmap data for p_buffer</param>
+        private void performCancellingRGB(ref byte[] p_buffer, BitmapData p_data)
         {
-            Point filterCenter = m_center;
-            filterCenter.X += p_data.Width / 2;
-            filterCenter.Y = (p_data.Height / 2) - filterCenter.Y;
-
             //Get the bounds of the rectangle centered around the center given by the obj
-            Point topLeft = new Point(filterCenter.X - (m_filterArea.Width / 2),
-                                      filterCenter.Y - (m_filterArea.Height / 2));
-            Point bottomRight = new Point(filterCenter.X + (m_filterArea.Width / 2),
-                                          filterCenter.Y + (m_filterArea.Height / 2)); 
+            Point topLeft = new Point(m_filterArea.X, m_filterArea.Y);
+            Point bottomRight = new Point(m_filterArea.X + m_filterArea.Width,
+                                          m_filterArea.Y + m_filterArea.Height);
+
             int byteOffset = 0;
 
             //Iterate through each column
@@ -543,20 +689,14 @@ namespace MotionGestureProcessing
         /// <summary>
         /// Cancels out the pixels that aren't near the hand
         /// </summary>
-        /// <param name="p_buffer"></param>
-        /// <param name="p_data"></param>
-        /// <param name="obj">imageData</param>
-        private void performCancellingARGB(ref byte[] p_buffer, BitmapData p_data, Object obj)
+        /// <param name="p_buffer">image buffer</param>
+        /// <param name="p_data">bitmap data for p_buffer</param>
+        private void performCancellingARGB(ref byte[] p_buffer, BitmapData p_data)
         {
-            Point filterCenter = m_center;
-            filterCenter.X += p_data.Width / 2;
-            filterCenter.Y = (p_data.Height / 2) - filterCenter.Y;
-
             //Get the bounds of the rectangle centered around the center given by the obj
-            Point topLeft = new Point(filterCenter.X - (m_filterArea.Width / 2), 
-                                      filterCenter.Y - (m_filterArea.Height / 2));
-            Point bottomRight = new Point(filterCenter.X + (m_filterArea.Width / 2),
-                                          filterCenter.Y + (m_filterArea.Height / 2));
+            Point topLeft = new Point(m_filterArea.X, m_filterArea.Y);
+            Point bottomRight = new Point(m_filterArea.X + m_filterArea.Width,
+                                          m_filterArea.Y + m_filterArea.Height);
 
             int byteOffset = 0;
 

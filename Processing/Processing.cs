@@ -13,6 +13,7 @@ namespace MotionGestureProcessing
     {
         public delegate void ImageReadyHandler(imageData data);
         public event ImageReadyHandler IsolationImageFilled;
+        public event ImageReadyHandler PCAImageFilled;
         public event ImageReadyHandler ReturnImageFilled;
 
         #region Member Variables and Properties
@@ -22,6 +23,7 @@ namespace MotionGestureProcessing
         //Hand Isolation class and handler for ready event
         private HandIsolation m_handIso;
         private HandIsolation.ProcessReadyHandler m_HIHandler;
+        private PCA m_PCA;
 
         public bool IsInitialized { get; set; }
         public Semaphore IsolationToPCA { get; set; }
@@ -42,12 +44,26 @@ namespace MotionGestureProcessing
         public imageData ToPCAImage { 
             set {
                 IsolationToPCA.WaitOne();
-                ToReturnImage = value; 
+                if (PCAImageFilled != null)
+                {
+                    PCAImageFilled(value);
+                }
+                else
+                    ToGesturesImage = value;
             }
         }
-        public imageData ToGesturesImage { get; set; }
-        public imageData ToReturnImage { set{
+
+        public imageData ToGesturesImage {
+            set{
                 IsolationToPCA.Release();
+                PCAToGestures.WaitOne();
+                ToReturnImage = value;
+            } 
+        }
+
+        public imageData ToReturnImage { 
+            set{
+                PCAToGestures.Release();
                 ReturnImageFilled(value);
             } 
         }
@@ -64,6 +80,7 @@ namespace MotionGestureProcessing
             feedBackData     = new Mutex();
 
             m_handIso = new HandIsolation();
+            m_PCA = new PCA();
         }
 
         /// <summary>
@@ -88,6 +105,10 @@ namespace MotionGestureProcessing
             {
                 stop();
                 IsInitialized = false;
+            }
+            else
+            {
+                m_PCA.initialize();
             }
 
             ToIsolationImage = new imageData(true, await m_camCapture.grabImage());

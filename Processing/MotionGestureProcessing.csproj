@@ -44,6 +44,7 @@
     <Compile Include="HandIsolation.cs" />
     <Compile Include="imageData.cs" />
     <Compile Include="ImageProcessing.cs" />
+    <Compile Include="PCA.cs" />
     <Compile Include="Process.cs" />
     <Compile Include="Processing.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

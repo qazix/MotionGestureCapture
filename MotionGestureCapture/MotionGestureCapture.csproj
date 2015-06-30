@@ -35,16 +35,9 @@
     <StartupObject />
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="DirectShowLib-2005">
-      <HintPath>C:\Program Files (x86)\Microsoft Visual Studio 12.0\Common7\Packages\DirectShow\lib\DirectShowLib-2005.dll</HintPath>
-    </Reference>
-    <Reference Include="DirectX.Capture, Version=1.0.4550.38383, Culture=neutral, processorArchitecture=MSIL">
+    <Reference Include="DirectShowLib-2005, Version=2.1.0.0, Culture=neutral, PublicKeyToken=67e7b740cdfc2d3f, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>C:\Program Files (x86)\Microsoft Visual Studio 12.0\Common7\Packages\DirectX.Capture.dll</HintPath>
-    </Reference>
-    <Reference Include="DShowNET, Version=1.0.0.1, Culture=neutral, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>C:\Program Files (x86)\Microsoft Visual Studio 12.0\Common7\Packages\DShowNET.dll</HintPath>
+      <HintPath>..\libs\DirectShowLib-2005.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />

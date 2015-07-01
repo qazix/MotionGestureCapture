@@ -246,7 +246,7 @@ namespace MotionGestureProcessing
         /// UPDATE: this now performs almost insantly instead of the 2 seconds it took before
         /// </summary>
         /// <param name="p_imageData"></param>
-        protected override void doWork(Object p_imageData)
+        protected override async void doWork(Object p_imageData)
         {
             if (m_isInitialized)
             {
@@ -311,6 +311,7 @@ namespace MotionGestureProcessing
                 ((imageData)p_imageData).Datapoints = getDataPoints(buffer, data);
 
                 findHand((imageData)p_imageData, data, buffer);
+                ((imageData)p_imageData).Filter = m_filterArea;
                 drawCenter(buffer, data);
 
                 //Guasian cancelling
@@ -426,20 +427,13 @@ namespace MotionGestureProcessing
             m_filterArea.X = closest.X - m_filterArea.Width / 2;
             m_filterArea.Y = closest.Y - m_filterArea.Height / 2;
 
-            /*
-            m_center = new Point((m_filterArea.X >= 0 ? m_filterArea.X : 0),
-                                 (m_filterArea.Y >= 0 ? m_filterArea.Y : 0));
-            drawCenter(p_buffer, p_data);
-            m_center = new Point((m_filterArea.X + m_filterArea.Width <= p_data.Width ? m_filterArea.X + m_filterArea.Width : p_data.Width),
-                                 (m_filterArea.Y + m_filterArea.Height < p_data.Height ? m_filterArea.Y + m_filterArea.Height : p_data.Height - 1));
-            drawCenter(p_buffer, p_data);
-            */
-
             //Create a smaller window
             xProjection = new int[m_filterArea.Width];
             yProjection = new int[m_filterArea.Height];
             xSmoothed = new int[m_filterArea.Width];
             ySmoothed = new int[m_filterArea.Height];
+
+            List<Point> toRemove = new List<Point>();
 
             //Populate it with only data points that are within the rectangle
             foreach (Point point in p_imageData.Datapoints)
@@ -449,6 +443,16 @@ namespace MotionGestureProcessing
                     ++xProjection[point.X - m_filterArea.X];
                     ++yProjection[point.Y - m_filterArea.Y];
                 }
+                else
+                {
+                    toRemove.Add(point);
+                }
+            }
+            
+            //Remove all the points outside of the filter rectangle
+            foreach (Point point in toRemove)
+            {
+                p_imageData.Datapoints.Remove(point);
             }
 
             //Smooth it out before the finding the center

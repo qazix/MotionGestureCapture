@@ -312,7 +312,7 @@ namespace MotionGestureProcessing
 
                 findHand((imageData)p_imageData, data, buffer);
                 ((imageData)p_imageData).Filter = m_filterArea;
-                drawCenter(buffer, data);
+                //drawCenter(buffer, data, m_center);
 
                 //Guasian cancelling
                 if (depth == 3)
@@ -327,37 +327,6 @@ namespace MotionGestureProcessing
                 //If someone is listener raise an event
                 if (ProcessReady != null)
                     ProcessReady();
-            }
-        }
-
-        /// <summary>
-        /// draws the center of the hand 
-        /// FOR TESTING
-        /// </summary>
-        /// <param name="p_buffer"></param>
-        /// <param name="p_data"></param>
-        private void drawCenter(byte[] p_buffer, BitmapData p_data)
-        {
-            int depth = p_data.Stride / p_data.Width;
-            int offset = m_center.X * depth;
-            for (int y = 0; y < p_data.Height; ++y)
-            {
-                if (y != m_center.Y)
-                {
-                    p_buffer[offset] = p_buffer[offset + 2] = 0;
-                    p_buffer[offset + 1] = 255;
-                }
-                else
-                {
-                    offset = (y * p_data.Stride);
-                    for (int x = 0; x < p_data.Stride; x += depth)
-                    {
-                        p_buffer[offset + x] = p_buffer[offset + x + 2] = 0;
-                        p_buffer[offset + x + 1] = 255;
-                    }
-                    offset += m_center.X * depth;
-                }
-                offset += p_data.Stride;
             }
         }
 
@@ -433,7 +402,7 @@ namespace MotionGestureProcessing
             xSmoothed = new int[m_filterArea.Width];
             ySmoothed = new int[m_filterArea.Height];
 
-            List<Point> toRemove = new List<Point>();
+            List<Point> pointsInFilter = new List<Point>();
 
             //Populate it with only data points that are within the rectangle
             foreach (Point point in p_imageData.Datapoints)
@@ -442,18 +411,11 @@ namespace MotionGestureProcessing
                 {
                     ++xProjection[point.X - m_filterArea.X];
                     ++yProjection[point.Y - m_filterArea.Y];
-                }
-                else
-                {
-                    toRemove.Add(point);
+                    pointsInFilter.Add(point);
                 }
             }
-            
-            //Remove all the points outside of the filter rectangle
-            foreach (Point point in toRemove)
-            {
-                p_imageData.Datapoints.Remove(point);
-            }
+
+            p_imageData.Datapoints = pointsInFilter;
 
             //Smooth it out before the finding the center
             smoothing(ref xProjection, ref xSmoothed);

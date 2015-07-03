@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
+using System.Drawing.Imaging;
 using System.Linq;
 using System.Text;
 using System.Threading;
@@ -38,45 +39,61 @@ namespace MotionGestureProcessing
         /// </summary>
         /// <param name="obj">Data pertaining to this image</param>
         /// <param name="p_image">Image to be processed</param>
+        /// <seealso cref="http://www.cs.otago.ac.nz/cosc453/student_tutorials/principal_components.pdf"/>
         protected override async void doWork(Object p_imgData)
         {
             List<Point> dataPoints = ((imageData)p_imgData).Datapoints;
 
-            PCAData pcaData = centerData(dataPoints, ((imageData)p_imgData).Filter);
+            //Step 2 of PCA Step 1 is gathering data.
+            PCAData pcaData = getMeanValues(dataPoints, ((imageData)p_imgData).Filter);
             
+            //The point will be null if there were no points to observe
             if (pcaData != null)
-                processPCA(pcaData);
+            {
+                //Readjust center
+                ((imageData)p_imgData).Filter = new Rectangle((int)(pcaData.XBar - ((imageData)p_imgData).Filter.Width),
+                                                              (int)(pcaData.YBar - ((imageData)p_imgData).Filter.Height),
+                                                              ((imageData)p_imgData).Filter.Width,
+                                                              ((imageData)p_imgData).Filter.Height);
+                //step 3 develop the coVariance matrix
+                genCoVarMatrix(dataPoints, pcaData);
 
+                //step 4 get eigenvectors and values
+                calculateEigens(pcaData);
+            }
+
+            //todo replace with method that draws angles
+            byte[] buffer;
+            BitmapData data = lockBitmap(out buffer, ((imageData)p_imgData).Image);
+            drawCenter(buffer, data, new Point(((imageData)p_imgData).Filter.X + ((imageData)p_imgData).Filter.Width,
+                                               ((imageData)p_imgData).Filter.Y + ((imageData)p_imgData).Filter.Height));
+            unlockBitmap(ref buffer, ref data, ((imageData)p_imgData).Image);
             Processing.getInstance().ToGesturesImage = (imageData)p_imgData;
         }
 
         /// <summary>
         /// Gather info about the dataPoints
         /// </summary>
-        /// <param name="p_dataPoints">Evaluate</param>
-        private PCAData centerData(List<Point> p_dataPoints, Rectangle p_filter)
+        /// <param name="p_dataPoints">dataset to evaluate</param>
+        private PCAData getMeanValues(List<Point> p_dataPoints, Rectangle p_filter)
         {
             if (p_dataPoints.Count == 0)
                 return null;
 
             PCAData pcaData = new PCAData();
-            int xOffset, yOffset;
-            xOffset = p_filter.X + p_filter.Width / 2;
-            yOffset = p_filter.Y + p_filter.Height / 2;
 
-            //Populate volatile data members of the PCAData object
-            Parallel.ForEach(p_dataPoints, point =>
+            //Populate data members of the PCAData object
+            /*Parallel.ForEach(p_dataPoints, point =>
                 {
-                    int x = point.X - xOffset;
-                    int y = point.Y - yOffset;
-
-                    Interlocked.MemoryBarrier();
-                    pcaData.Sumx += x;
-                    pcaData.Sumy += y;
-                    pcaData.Sumxx += x * x;
-                    pcaData.Sumyy += y * y;
-                    pcaData.Sumxy += x * y;
+                    pcaData.Sumx += point.X;
+                    pcaData.Sumy += point.Y;
                 });
+            */
+            foreach(Point point in p_dataPoints)
+            {
+                pcaData.Sumx += point.X;
+                pcaData.Sumy += point.Y;
+            }
 
             pcaData.N = p_dataPoints.Count;
             pcaData.XBar = pcaData.Sumx / pcaData.N;
@@ -85,69 +102,127 @@ namespace MotionGestureProcessing
             return pcaData;
         }
 
-        private void processPCA(PCAData p_pcaData)
+        /// <summary>
+        /// This method is designed to create a covariance matrix.
+        /// </summary>
+        /// <param name="p_pcaData"></param>
+        private void genCoVarMatrix(List<Point> p_dataPoints, PCAData p_pcaData)
         {
-            //variance and covariance
-            p_pcaData.XVar = p_pcaData.Sumxx / p_pcaData.N - p_pcaData.XBar * p_pcaData.XBar;
-            p_pcaData.YVar = p_pcaData.Sumyy / p_pcaData.N - p_pcaData.YBar * p_pcaData.YBar;
-            p_pcaData.CoVarXY = p_pcaData.Sumxy / p_pcaData.N - p_pcaData.XBar * p_pcaData.YBar;
+            //Sum up the mean product
+            /*Parallel.ForEach(p_dataPoints, point =>
+                {
+                    p_pcaData.XVar = (point.X - p_pcaData.XBar) * (point.X - p_pcaData.XBar);
+                    p_pcaData.YVar = (point.Y - p_pcaData.YBar) * (point.Y - p_pcaData.YBar);
+                    p_pcaData.CoVar = (point.X - p_pcaData.XBar) * (point.Y - p_pcaData.YBar);
+                });*/
 
-            p_pcaData.SumVars = p_pcaData.XVar + p_pcaData.YVar;
-            p_pcaData.diffVars = p_pcaData.XVar - p_pcaData.YVar;
-            p_pcaData.Discriminant = p_pcaData.diffVars * p_pcaData.diffVars + 4 * p_pcaData.CoVarXY * p_pcaData.CoVarXY;
-            p_pcaData.SqrtDisc = Math.Sqrt(p_pcaData.Discriminant);
+            foreach (Point point in p_dataPoints)
+            {
+                p_pcaData.XVar = (point.X - p_pcaData.XBar) * (point.X - p_pcaData.XBar);
+                p_pcaData.YVar = (point.Y - p_pcaData.YBar) * (point.Y - p_pcaData.YBar);
+                p_pcaData.CoVar = (point.X - p_pcaData.XBar) * (point.Y - p_pcaData.YBar);
+            }
 
-            //Eigenvalues
-            p_pcaData.LambdaPlus = (p_pcaData.SumVars + p_pcaData.SqrtDisc) / 2;
-            p_pcaData.LambdaMinus = (p_pcaData.SumVars - p_pcaData.SqrtDisc) / 2;
+            //perform the (n-1) division
+            p_pcaData.XVar /= (p_pcaData.N - 1);
+            p_pcaData.YVar /= (p_pcaData.N - 1);
+            p_pcaData.CoVar /= (p_pcaData.N - 1);
 
-            //Eigenvectors  
-            p_pcaData.APlus = p_pcaData.XVar + p_pcaData.CoVarXY - p_pcaData.LambdaMinus;
-            p_pcaData.BPlus = p_pcaData.YVar + p_pcaData.CoVarXY - p_pcaData.LambdaMinus;
-
-            p_pcaData.AMinus = p_pcaData.XVar + p_pcaData.CoVarXY - p_pcaData.LambdaPlus;
-            p_pcaData.BMinus = p_pcaData.YVar + p_pcaData.CoVarXY - p_pcaData.LambdaPlus;
-
-            //Normalize the vectors
-            double aParallel, bParallel, aNormal, bNormal;
-
-            double denomPlus = Math.Sqrt(p_pcaData.APlus * p_pcaData.APlus + p_pcaData.BPlus * p_pcaData.BPlus);
-            double denomMinus = Math.Sqrt(p_pcaData.AMinus * p_pcaData.AMinus + p_pcaData.BMinus * p_pcaData.BMinus);
-
-            aParallel = p_pcaData.APlus / denomPlus;
-            bParallel = p_pcaData.BPlus / denomPlus;
-            aNormal = p_pcaData.AMinus / denomMinus;
-            bNormal = p_pcaData.BMinus / denomMinus;
-
-            // Semi axes
-            double k = 2;
-            double majoraxis = k * Math.Sqrt(p_pcaData.LambdaPlus);
-            double minoraxis = k * Math.Sqrt(p_pcaData.LambdaMinus);
+            /*
+             * var(x),      coVar(x, y)
+             * coVar(y, x), var(y) 
+             * */
+            //populate covar matrix
+            p_pcaData.coVarMatrix[0, 0] = p_pcaData.XVar;
+            p_pcaData.coVarMatrix[0, 1] = p_pcaData.coVarMatrix[1, 0] = p_pcaData.CoVar;
+            p_pcaData.coVarMatrix[1, 1] = p_pcaData.YVar;
         }
 
+        /// <summary>
+        /// This function first find the Eigen Values using discriminants
+        /// 
+        /// </summary>
+        /// <param name="p_pcaData"></param>
+        private void calculateEigens(PCAData p_pcaData)
+        {
+            /* let Oab equal covariance of ab so Oaa would be the variance
+             * This is after the A - lambda*I 
+             *  Oxx - lambda, Oxy
+             *  Oxy,          Oyy - lambda
+             *  find the determinant
+             *  
+             * lambda^2 -(Oyy - Oxx)lambda - (Oxy^2 -Oxx * Oyy)
+             */
+
+            //The following performs the quadratic formula on the above function
+            double diffVar = p_pcaData.XVar - p_pcaData.YVar;
+            double discriminant = Math.Sqrt(diffVar * diffVar -
+                                            4 * (p_pcaData.CoVar * p_pcaData.CoVar - p_pcaData.XVar * p_pcaData.YVar));
+            double lambdaPlus = (-diffVar + discriminant) / 2;
+            double lambdaMinus = (-diffVar - discriminant) / 2;
+
+            p_pcaData.eigenValues[0] = lambdaMinus;
+            p_pcaData.eigenValues[1] = lambdaPlus;
+
+            //Now we have the eigen values time to get the eigenvectors that match them
+            /*
+             *  Oxx - lambda, Oxy
+             *  Oxy,          Oyy - lambda
+             * 
+             * convert to  RRE format
+             * 
+             * 1, 0 : -Oxy / (Oxx - lambda)
+             * 0, 1 : -Oxy / (Oyy - lambda)
+             */
+            p_pcaData.eigenVectors[0, 0] = -p_pcaData.CoVar / (p_pcaData.XVar - p_pcaData.eigenValues[0]);
+            p_pcaData.eigenVectors[0, 1] = -p_pcaData.CoVar / (p_pcaData.YVar - p_pcaData.eigenValues[0]);
+
+            p_pcaData.eigenVectors[1, 0] = -p_pcaData.CoVar / (p_pcaData.XVar - p_pcaData.eigenValues[1]);
+            p_pcaData.eigenVectors[1, 1] = -p_pcaData.CoVar / (p_pcaData.YVar - p_pcaData.eigenValues[1]);
+        }
+
+        /// <summary>
+        /// struct for PCA data.  
+        /// <remarks>volatile variable can only be int or float
+        /// becuase of this I end up with mixed data types.
+        /// </remarks>
+        /// </summary>
         private class PCAData
         {
             public int N { get; set; }
-            public long Sumx { get; set; }
-            public long Sumy { get; set; }
-            public long Sumxx { get; set; }
-            public long Sumyy { get; set; }
-            public long Sumxy { get; set; }
-            public double XBar { get; set; }
-            public double YBar { get; set; }
-            public double XVar { get; set; }
-            public double YVar { get; set; }
-            public double CoVarXY { get; set; }
-            public double SumVars { get; set; }
-            public double diffVars { get; set; }
-            public double Discriminant { get; set; }
-            public double SqrtDisc { get; set; }
-            public double LambdaPlus { get; set; }
-            public double LambdaMinus { get; set; }
-            public double APlus { get; set; }
-            public double BPlus { get; set; }
-            public double AMinus { get; set; }
-            public double BMinus { get; set; }
+            private volatile int m_sumx;
+            private volatile int m_sumy;
+            private float m_xvar;
+            private float m_yvar;
+            private float m_covar;
+
+            public int Sumx {
+                get { return m_sumx; }
+                set { m_sumx = value; }
+            }
+            public int Sumy {
+                get { return m_sumy; }
+                set { m_sumy = value; }
+            }
+            public float XBar { get; set; }
+            public float YBar { get; set; }
+            public float XVar {
+                get { return m_xvar; }
+                set { m_xvar = value; }
+            }
+            public float YVar {
+                get { return m_yvar; }
+                set { m_yvar = value; }
+            }
+            public float CoVar {
+                get { return m_covar; }
+                set { m_covar = value; }
+            }
+
+            public double[,] coVarMatrix = new double[2, 2];
+
+            public double[] eigenValues = new double[2];
+            public double[,] eigenVectors = new double[2, 2];
         }
     }
 

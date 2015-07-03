@@ -56,5 +56,36 @@ namespace MotionGestureProcessing
         /// <param name="obj">Data pertaining to this image</param>
         /// <param name="p_image">Image to be processed</param>
         protected abstract void doWork(Object p_imgData);
+
+        /// <summary>
+        /// draws the center of the hand 
+        /// FOR TESTING
+        /// </summary>
+        /// <param name="p_buffer"></param>
+        /// <param name="p_data"></param>
+        protected void drawCenter(byte[] p_buffer, BitmapData p_data, Point p_center)
+        {
+            int depth = p_data.Stride / p_data.Width;
+            int offset = p_center.X * depth;
+            for (int y = 0; y < p_data.Height; ++y)
+            {
+                if (y != p_center.Y)
+                {
+                    p_buffer[offset] = p_buffer[offset + 2] = 0;
+                    p_buffer[offset + 1] = 255;
+                }
+                else
+                {
+                    offset = (y * p_data.Stride);
+                    for (int x = 0; x < p_data.Stride; x += depth)
+                    {
+                        p_buffer[offset + x] = p_buffer[offset + x + 2] = 0;
+                        p_buffer[offset + x + 1] = 255;
+                    }
+                    offset += p_center.X * depth;
+                }
+                offset += p_data.Stride;
+            }
+        }
     }
 }

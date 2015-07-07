@@ -87,5 +87,80 @@ namespace MotionGestureProcessing
                 offset += p_data.Stride;
             }
         }
+
+        /// <summary>
+        /// Draws a cross at the center and accounts for rotation
+        /// </summary>
+        /// <param name="p_buffer"></param>
+        /// <param name="p_data"></param>
+        /// <param name="p_vectors"></param>
+        protected void drawOrientation(byte[] p_buffer, BitmapData p_data, double[,] p_vectors, Point p_center)
+        {
+            double[] primPos = new double[2];
+            double[] primNeg = new double[2];
+            double[] secPos = new double [2];
+            double[] secNeg = new double [2];
+
+            primNeg[0] = -1 * (primPos[0] = p_vectors[0, 0]);
+            primNeg[1] = -1 * (primPos[1] = p_vectors[0, 1]);
+            secNeg[0] = -1 * (secPos[0] = p_vectors[1, 0]);
+            secNeg[1] = -1 * (secPos[1] = p_vectors[1, 1]);
+            
+            Parallel.Invoke(
+            () =>
+            {
+                dividedDrawOrientation(p_buffer, p_data, primPos, p_center);
+            },
+            () =>
+            {
+                dividedDrawOrientation(p_buffer, p_data, primNeg, p_center);
+            },
+            () =>
+            {
+                dividedDrawOrientation(p_buffer, p_data, secPos, p_center);
+            },
+            () =>
+            {
+                dividedDrawOrientation(p_buffer, p_data, secNeg, p_center);
+            });
+        }
+
+        /// <summary>
+        /// Draws a ray from the center following the vector given
+        /// </summary>
+        /// <param name="p_buffer">medium to draw upon</param>
+        /// <param name="p_data">information about the buffer</param>
+        /// <param name="p_vector">vector to draw</param>
+        /// <param name="p_center">starting point</param>
+        private void dividedDrawOrientation(byte[] p_buffer, BitmapData p_data, double[]p_vector, Point p_center)
+        {
+            double[] curPos = new double[2];
+            curPos[0] = p_center.X + p_vector[0];
+            curPos[1] = p_center.Y + p_vector[1];  
+
+            int depth = p_data.Stride / p_data.Width;
+
+            bool valid;
+            int offset;
+
+            do
+            {
+                if (curPos[0] > 0 && curPos[0] < p_data.Width && 
+                    curPos[1] > 0 && curPos[1] < p_data.Height)
+                    valid = true;
+                else
+                    valid = false;
+                if (valid)
+                {
+                    offset = (((int)curPos[1] * p_data.Width) + (int)curPos[0]) * depth;
+                    p_buffer[offset] = p_buffer[offset + 2] = 0;
+                    p_buffer[offset + 1] = 255;
+                }
+
+                curPos[0] += p_vector[0];
+                curPos[1] += p_vector[1];
+            }
+            while(valid);
+        }
     }
 }

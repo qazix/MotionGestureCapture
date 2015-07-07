@@ -60,14 +60,14 @@ namespace MotionGestureProcessing
 
                 //step 4 get eigenvectors and values
                 calculateEigens(pcaData);
+
+                //Draw the center with new axes
+                byte[] buffer;
+                BitmapData data = lockBitmap(out buffer, ((imageData)p_imgData).Image);
+                drawOrientation(buffer, data, pcaData.eigenVectors, new Point((int)pcaData.XBar, (int)pcaData.YBar));                
+                unlockBitmap(ref buffer, ref data, ((imageData)p_imgData).Image);
             }
 
-            //todo replace with method that draws angles
-            byte[] buffer;
-            BitmapData data = lockBitmap(out buffer, ((imageData)p_imgData).Image);
-            drawCenter(buffer, data, new Point(((imageData)p_imgData).Filter.X + ((imageData)p_imgData).Filter.Width,
-                                               ((imageData)p_imgData).Filter.Y + ((imageData)p_imgData).Filter.Height));
-            unlockBitmap(ref buffer, ref data, ((imageData)p_imgData).Image);
             Processing.getInstance().ToGesturesImage = (imageData)p_imgData;
         }
 
@@ -118,9 +118,9 @@ namespace MotionGestureProcessing
 
             foreach (Point point in p_dataPoints)
             {
-                p_pcaData.XVar = (point.X - p_pcaData.XBar) * (point.X - p_pcaData.XBar);
-                p_pcaData.YVar = (point.Y - p_pcaData.YBar) * (point.Y - p_pcaData.YBar);
-                p_pcaData.CoVar = (point.X - p_pcaData.XBar) * (point.Y - p_pcaData.YBar);
+                p_pcaData.XVar += (point.X - p_pcaData.XBar) * (point.X - p_pcaData.XBar);
+                p_pcaData.YVar += (point.Y - p_pcaData.YBar) * (point.Y - p_pcaData.YBar);
+                p_pcaData.CoVar += (point.X - p_pcaData.XBar) * (point.Y - p_pcaData.YBar);
             }
 
             //perform the (n-1) division
@@ -128,14 +128,6 @@ namespace MotionGestureProcessing
             p_pcaData.YVar /= (p_pcaData.N - 1);
             p_pcaData.CoVar /= (p_pcaData.N - 1);
 
-            /*
-             * var(x),      coVar(x, y)
-             * coVar(y, x), var(y) 
-             * */
-            //populate covar matrix
-            p_pcaData.coVarMatrix[0, 0] = p_pcaData.XVar;
-            p_pcaData.coVarMatrix[0, 1] = p_pcaData.coVarMatrix[1, 0] = p_pcaData.CoVar;
-            p_pcaData.coVarMatrix[1, 1] = p_pcaData.YVar;
         }
 
         /// <summary>
@@ -151,18 +143,26 @@ namespace MotionGestureProcessing
              *  Oxy,          Oyy - lambda
              *  find the determinant
              *  
-             * lambda^2 -(Oyy - Oxx)lambda - (Oxy^2 -Oxx * Oyy)
+             * lambda^2 + (-Oyy - Oxx)lambda + (OxxOyy - Oxy^2)
              */
 
             //The following performs the quadratic formula on the above function
-            double diffVar = p_pcaData.XVar - p_pcaData.YVar;
+            double diffVar = -p_pcaData.YVar - p_pcaData.XVar;   
             double discriminant = Math.Sqrt(diffVar * diffVar -
-                                            4 * (p_pcaData.CoVar * p_pcaData.CoVar - p_pcaData.XVar * p_pcaData.YVar));
+                                            4 * (p_pcaData.XVar * p_pcaData.YVar - p_pcaData.CoVar * p_pcaData.CoVar));
             double lambdaPlus = (-diffVar + discriminant) / 2;
             double lambdaMinus = (-diffVar - discriminant) / 2;
 
-            p_pcaData.eigenValues[0] = lambdaMinus;
-            p_pcaData.eigenValues[1] = lambdaPlus;
+            if (lambdaPlus > lambdaMinus)
+            {
+                p_pcaData.eigenValues[0] = lambdaPlus;
+                p_pcaData.eigenValues[1] = lambdaMinus;
+            }
+            else
+            {
+                p_pcaData.eigenValues[0] = lambdaMinus;
+                p_pcaData.eigenValues[1] = lambdaPlus;
+            }
 
             //Now we have the eigen values time to get the eigenvectors that match them
             /*
@@ -171,14 +171,45 @@ namespace MotionGestureProcessing
              * 
              * convert to  RRE format
              * 
+             * x, y
              * 1, 0 : -Oxy / (Oxx - lambda)
              * 0, 1 : -Oxy / (Oyy - lambda)
              */
-            p_pcaData.eigenVectors[0, 0] = -p_pcaData.CoVar / (p_pcaData.XVar - p_pcaData.eigenValues[0]);
-            p_pcaData.eigenVectors[0, 1] = -p_pcaData.CoVar / (p_pcaData.YVar - p_pcaData.eigenValues[0]);
 
-            p_pcaData.eigenVectors[1, 0] = -p_pcaData.CoVar / (p_pcaData.XVar - p_pcaData.eigenValues[1]);
-            p_pcaData.eigenVectors[1, 1] = -p_pcaData.CoVar / (p_pcaData.YVar - p_pcaData.eigenValues[1]);
+            //for some reason when the coVar is positive my primary is correct and secondary isn't normal
+            // and when it's negative secondary is correct and primary isn't normal
+            if (p_pcaData.CoVar > 0)
+            {
+                //first principal component
+                p_pcaData.eigenVectors[0, 0] = -p_pcaData.CoVar / (p_pcaData.XVar - p_pcaData.eigenValues[0]);
+                p_pcaData.eigenVectors[0, 1] = -p_pcaData.CoVar / (p_pcaData.YVar - p_pcaData.eigenValues[0]);
+
+                //second is normal to the first
+                p_pcaData.eigenVectors[1, 0] = -p_pcaData.eigenVectors[0, 1];
+                p_pcaData.eigenVectors[1, 1] = p_pcaData.eigenVectors[0, 0];
+            }
+
+            else
+            {
+                //second principal component
+                p_pcaData.eigenVectors[1, 0] = -p_pcaData.CoVar / (p_pcaData.XVar - p_pcaData.eigenValues[1]);
+                p_pcaData.eigenVectors[1, 1] = -p_pcaData.CoVar / (p_pcaData.YVar - p_pcaData.eigenValues[1]);
+
+                //first is normal to second
+                p_pcaData.eigenVectors[0, 0] = p_pcaData.eigenVectors[1, 1];
+                p_pcaData.eigenVectors[0, 1] = -p_pcaData.eigenVectors[1, 0];
+            }
+            //normalize component
+            //normX = x / sqrt(x*x + y*y) normY = y / sqrt(x*x + y*y)
+            double len = Math.Sqrt(p_pcaData.eigenVectors[0, 0] * p_pcaData.eigenVectors[0, 0] +
+                                   p_pcaData.eigenVectors[0, 1] * p_pcaData.eigenVectors[0, 1]);
+            p_pcaData.eigenVectors[0, 0] /= len;
+            p_pcaData.eigenVectors[0, 1] /= len;
+
+            len = Math.Sqrt(p_pcaData.eigenVectors[1, 0] * p_pcaData.eigenVectors[1, 0] +
+                            p_pcaData.eigenVectors[1, 1] * p_pcaData.eigenVectors[1, 1]);
+            p_pcaData.eigenVectors[1, 0] /= len;
+            p_pcaData.eigenVectors[1, 1] /= len;
         }
 
         /// <summary>
@@ -192,9 +223,9 @@ namespace MotionGestureProcessing
             public int N { get; set; }
             private volatile int m_sumx;
             private volatile int m_sumy;
-            private float m_xvar;
-            private float m_yvar;
-            private float m_covar;
+            private double m_xvar;
+            private double m_yvar;
+            private double m_covar;
 
             public int Sumx {
                 get { return m_sumx; }
@@ -206,21 +237,19 @@ namespace MotionGestureProcessing
             }
             public float XBar { get; set; }
             public float YBar { get; set; }
-            public float XVar {
+            public double XVar {
                 get { return m_xvar; }
                 set { m_xvar = value; }
             }
-            public float YVar {
+            public double YVar {
                 get { return m_yvar; }
                 set { m_yvar = value; }
             }
-            public float CoVar {
+            public double CoVar {
                 get { return m_covar; }
                 set { m_covar = value; }
             }
-
-            public double[,] coVarMatrix = new double[2, 2];
-
+            
             public double[] eigenValues = new double[2];
             public double[,] eigenVectors = new double[2, 2];
         }

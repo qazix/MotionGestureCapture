@@ -14,6 +14,7 @@ namespace MotionGestureProcessing
         public delegate void ImageReadyHandler(imageData data);
         public event ImageReadyHandler IsolationImageFilled;
         public event ImageReadyHandler PCAImageFilled;
+        public event ImageReadyHandler GesturesImageFilled;
         public event ImageReadyHandler ReturnImageFilled;
 
         #region Member Variables and Properties
@@ -24,6 +25,7 @@ namespace MotionGestureProcessing
         private HandIsolation m_handIso;
         private HandIsolation.ProcessReadyHandler m_HIHandler;
         private PCA m_PCA;
+        private Gesture m_gesture;
 
         public bool IsInitialized { get; set; }
         public Semaphore IsolationToPCA { get; set; }
@@ -57,7 +59,10 @@ namespace MotionGestureProcessing
             set{
                 IsolationToPCA.Release();
                 PCAToGestures.WaitOne();
-                ToReturnImage = value;
+                if (GesturesImageFilled != null)
+                    GesturesImageFilled(value);
+                else
+                    ToReturnImage = value;
             } 
         }
 
@@ -81,6 +86,7 @@ namespace MotionGestureProcessing
 
             m_handIso = new HandIsolation();
             m_PCA = new PCA();
+            m_gesture = new Gesture();
         }
 
         /// <summary>
@@ -109,6 +115,7 @@ namespace MotionGestureProcessing
             else
             {
                 m_PCA.initialize();
+                m_gesture.initialize();
             }
 
             ToIsolationImage = new imageData(true, await m_camCapture.grabImage());

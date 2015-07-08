@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 
 namespace MotionGestureProcessing
 {
-    abstract class Process
+    public abstract class Process
     {
         /// <summary>
         /// performs Bitmap.lockBits but does all the setup as well

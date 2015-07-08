@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -56,16 +57,21 @@ namespace MotionGestureProcessing
                                                               ((imageData)p_imgData).Filter.Width,
                                                               ((imageData)p_imgData).Filter.Height);
                 //step 3 develop the coVariance matrix
-                genCoVarMatrix(dataPoints, pcaData);
+                genCoVarMatrix(dataPoints, ref pcaData);
 
                 //step 4 get eigenvectors and values
-                calculateEigens(pcaData);
+                calculateEigens(ref pcaData);
 
                 //Draw the center with new axes
                 byte[] buffer;
                 BitmapData data = lockBitmap(out buffer, ((imageData)p_imgData).Image);
                 drawOrientation(buffer, data, pcaData.eigenVectors, new Point((int)pcaData.XBar, (int)pcaData.YBar));                
                 unlockBitmap(ref buffer, ref data, ((imageData)p_imgData).Image);
+
+                //Adjust datapoints
+                adjustDatapoints(ref dataPoints, pcaData);
+
+                ((imageData)p_imgData).Datapoints = dataPoints;
             }
 
             Processing.getInstance().ToGesturesImage = (imageData)p_imgData;
@@ -106,7 +112,7 @@ namespace MotionGestureProcessing
         /// This method is designed to create a covariance matrix.
         /// </summary>
         /// <param name="p_pcaData"></param>
-        private void genCoVarMatrix(List<Point> p_dataPoints, PCAData p_pcaData)
+        private void genCoVarMatrix(List<Point> p_dataPoints, ref PCAData p_pcaData)
         {
             //Sum up the mean product
             /*Parallel.ForEach(p_dataPoints, point =>
@@ -135,7 +141,7 @@ namespace MotionGestureProcessing
         /// 
         /// </summary>
         /// <param name="p_pcaData"></param>
-        private void calculateEigens(PCAData p_pcaData)
+        private void calculateEigens(ref PCAData p_pcaData)
         {
             /* let Oab equal covariance of ab so Oaa would be the variance
              * This is after the A - lambda*I 
@@ -210,6 +216,44 @@ namespace MotionGestureProcessing
                             p_pcaData.eigenVectors[1, 1] * p_pcaData.eigenVectors[1, 1]);
             p_pcaData.eigenVectors[1, 0] /= len;
             p_pcaData.eigenVectors[1, 1] /= len;
+        }
+
+        /// <summary>
+        /// this transforms the original data by multiplying the eigenvectors by the mean adjusted data
+        /// The eigenvalues are generally stored in a matrix like so | x1, x2 | and so must be transposed
+        ///                                                          | y1, y2 | 
+        /// However I've already stored it as transposed so that won't happen.  Second the point matrix doesn't exist
+        /// per say, I'll explain the implementation later
+        /// </summary>
+        /// <param name="p_dataPoints">points to transform</param>
+        /// <param name="p_pcaData">holds the eigenvectors</param>
+        private void adjustDatapoints(ref List<Point> p_dataPoints, PCAData p_pcaData)
+        {
+            //Lists are immutable so i need to create a new list in order to work out the transform
+            List<Point> transPoints = new List<Point>();
+
+            double x1, y1, x2, y2;
+            float xbar, ybar;
+            x1 = p_pcaData.eigenVectors[0, 0];
+            y1 = p_pcaData.eigenVectors[0, 1];
+            x2 = p_pcaData.eigenVectors[1, 0];
+            y2 = p_pcaData.eigenVectors[1, 1];
+
+            xbar = p_pcaData.XBar;
+            ybar = p_pcaData.YBar;
+
+            //performs a matrix multiply 
+            foreach (Point point in p_dataPoints)
+            {
+                Point insert = new Point();
+
+                insert.X = (int)(x1 * (point.X - xbar) + y1 * (point.Y - ybar));
+                insert.Y = (int)(x2 * (point.X - xbar) + y2 * (point.Y - ybar));
+
+                transPoints.Add(insert);
+            }
+
+            p_dataPoints = transPoints;
         }
 
         /// <summary>

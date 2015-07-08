@@ -19,6 +19,7 @@ namespace MotionGestureCapture
         private static bool m_running = false; /* is the cam capturing */
         private int m_filterIndex; /* the index into the DsDevice array */
         private IGraphBuilder m_graph; /* hold the capture from a cap device */
+        private IAMCameraControl m_camControl;
         private IBaseFilter m_sampleGrabber; /* grabs individual samples. */
         private IMediaControl m_mediaControl; /* Display element for GUI */
         private IVideoWindow m_videoWindow; /* pictureBox control */
@@ -95,6 +96,12 @@ namespace MotionGestureCapture
             m_mediaControl = m_graph as IMediaControl;
             m_videoWindow = m_graph as IVideoWindow;
 
+            /* I wanted to see if I could turn auto focusing off but my machine doens't have it.
+            int check;
+            CameraControlFlags ccf;
+            int hr = m_camControl.Get(CameraControlProperty.Iris, out check, out ccf);
+            */
+
             if (m_picBox != null)
             {
                 setupPicBox();
@@ -133,6 +140,7 @@ namespace MotionGestureCapture
             m_graph = null;
             m_mediaControl = null;
             m_videoWindow = null;
+            m_camControl = null;
         }
 
         /// <summary>
@@ -174,6 +182,8 @@ namespace MotionGestureCapture
             //Get pins
             IPin capPin = DsFindPin.ByCategory(captureFilter, PinCategory.Capture, 0);
             IPin samPin = DsFindPin.ByDirection(m_sampleGrabber, PinDirection.Input, 0);
+
+            m_camControl = captureFilter as IAMCameraControl;
 
             //Create the media type, just a video RGB24 with VideoInfo formatType
             AMMediaType media = null;

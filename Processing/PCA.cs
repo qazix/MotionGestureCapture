@@ -159,16 +159,8 @@ namespace MotionGestureProcessing
             double lambdaPlus = (-diffVar + discriminant) / 2;
             double lambdaMinus = (-diffVar - discriminant) / 2;
 
-            if (lambdaPlus > lambdaMinus)
-            {
-                p_pcaData.eigenValues[0] = lambdaPlus;
-                p_pcaData.eigenValues[1] = lambdaMinus;
-            }
-            else
-            {
-                p_pcaData.eigenValues[0] = lambdaMinus;
-                p_pcaData.eigenValues[1] = lambdaPlus;
-            }
+            p_pcaData.eigenValues[0] = lambdaPlus;
+            p_pcaData.eigenValues[1] = lambdaMinus;
 
             //Now we have the eigen values time to get the eigenvectors that match them
             /*
@@ -187,8 +179,8 @@ namespace MotionGestureProcessing
             if (p_pcaData.CoVar > 0)
             {
                 //first principal component
-                p_pcaData.eigenVectors[0, 0] = -p_pcaData.CoVar / (p_pcaData.XVar - p_pcaData.eigenValues[0]);
-                p_pcaData.eigenVectors[0, 1] = -p_pcaData.CoVar / (p_pcaData.YVar - p_pcaData.eigenValues[0]);
+                p_pcaData.eigenVectors[0, 0] = p_pcaData.CoVar / (p_pcaData.XVar - p_pcaData.eigenValues[0]);
+                p_pcaData.eigenVectors[0, 1] = p_pcaData.CoVar / (p_pcaData.YVar - p_pcaData.eigenValues[0]);
 
                 //second is normal to the first
                 p_pcaData.eigenVectors[1, 0] = -p_pcaData.eigenVectors[0, 1];
@@ -198,12 +190,12 @@ namespace MotionGestureProcessing
             else
             {
                 //second principal component
-                p_pcaData.eigenVectors[1, 0] = -p_pcaData.CoVar / (p_pcaData.XVar - p_pcaData.eigenValues[1]);
-                p_pcaData.eigenVectors[1, 1] = -p_pcaData.CoVar / (p_pcaData.YVar - p_pcaData.eigenValues[1]);
+                p_pcaData.eigenVectors[1, 0] = p_pcaData.CoVar / (p_pcaData.XVar - p_pcaData.eigenValues[1]);
+                p_pcaData.eigenVectors[1, 1] = p_pcaData.CoVar / (p_pcaData.YVar - p_pcaData.eigenValues[1]);
 
                 //first is normal to second
-                p_pcaData.eigenVectors[0, 0] = p_pcaData.eigenVectors[1, 1];
-                p_pcaData.eigenVectors[0, 1] = -p_pcaData.eigenVectors[1, 0];
+                p_pcaData.eigenVectors[0, 0] = -p_pcaData.eigenVectors[1, 1];
+                p_pcaData.eigenVectors[0, 1] = p_pcaData.eigenVectors[1, 0];
             }
             //normalize component
             //normX = x / sqrt(x*x + y*y) normY = y / sqrt(x*x + y*y)

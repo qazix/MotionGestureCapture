@@ -276,7 +276,10 @@ namespace MotionGestureProcessing
             double rads = Math.Acos(1 - a2 / 2);
 
             //convert to degrees
-            return rads / Math.PI * 180;
+            if (x > 0)
+                return rads / Math.PI * 180;
+            else
+                return -rads / Math.PI * 180;
         }
 
         /// <summary>

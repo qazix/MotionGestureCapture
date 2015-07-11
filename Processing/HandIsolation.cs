@@ -557,6 +557,11 @@ namespace MotionGestureProcessing
                         p_buffer[offset + 0] = p_buffer[offset + 1] = 
                         p_buffer[offset + 2] = 0; //black is all zeroes
                     }
+                    else
+                    {
+                        //white is all 1
+                        p_buffer[offset] = p_buffer[offset + 1] = p_buffer[offset + 2] = 255;
+                    }
                 }
         }
 
@@ -589,6 +594,12 @@ namespace MotionGestureProcessing
                         p_buffer[offset + 0] = p_buffer[offset + 1] = 
                         p_buffer[offset + 2] = 0;
                         p_buffer[offset + 3] = 255;
+                    }
+                    else
+                    {
+                        //white is all 1
+                        p_buffer[offset] = p_buffer[offset + 1] = 
+                        p_buffer[offset + 2] = p_buffer[offset + 3] = 255;
                     }
                 }
         }

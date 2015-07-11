@@ -13,6 +13,7 @@ namespace MotionGestureProcessing
         public Image Image { get; set; }
         public List<Point> Datapoints { get; set; }
         public Rectangle Filter { get; set; }
+        public double Orientation { get; set; }
 
         public imageData(bool p_isInit, Image p_image)
         {

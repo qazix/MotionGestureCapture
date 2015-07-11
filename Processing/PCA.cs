@@ -69,9 +69,10 @@ namespace MotionGestureProcessing
                 unlockBitmap(ref buffer, ref data, ((imageData)p_imgData).Image);
 
                 //Adjust datapoints
-                adjustDatapoints(ref dataPoints, pcaData);
+                //adjustDatapoints(ref dataPoints, pcaData);
 
-                ((imageData)p_imgData).Datapoints = dataPoints;
+                //((imageData)p_imgData).Datapoints = dataPoints;
+                ((imageData)p_imgData).Orientation = getOrientation(pcaData.eigenVectors);
             }
 
             Processing.getInstance().ToGesturesImage = (imageData)p_imgData;
@@ -187,7 +188,7 @@ namespace MotionGestureProcessing
                 p_pcaData.eigenVectors[1, 1] = p_pcaData.eigenVectors[0, 0];
             }
 
-            else
+            //else
             {
                 //second principal component
                 p_pcaData.eigenVectors[1, 0] = p_pcaData.CoVar / (p_pcaData.XVar - p_pcaData.eigenValues[1]);
@@ -211,6 +212,8 @@ namespace MotionGestureProcessing
         }
 
         /// <summary>
+        /// NOT USED FOR ISSUES IN GESTURES
+        /// 
         /// this transforms the original data by multiplying the eigenvectors by the mean adjusted data
         /// The eigenvalues are generally stored in a matrix like so | x1, x2 | and so must be transposed
         ///                                                          | y1, y2 | 
@@ -246,6 +249,35 @@ namespace MotionGestureProcessing
             }
 
             p_dataPoints = transPoints;
+        }
+
+        /// <summary>
+        /// Use the principal component to determine the orientation
+        /// The top of the image represents 0 deg
+        /// 
+        /// This methods use the law of Cosines a^2 = b^2 + c^2 - 2bc * cos(A)
+        /// b = c = 1
+        /// thus 
+        /// a^2 = 2 - 2 * cos(A)
+        /// a^2 = (0 - x)(0 - x) + (-1--y)(-1--y)
+        /// a^2 = x^2 + (y-1)(y-1)
+        /// 2 * cos(A) = 2 - x^2 + (y-1)(y-1)
+        /// cos(A) = (2 - x^2 + (y-1)(y-1)) / 2
+        /// A = Acos((2 - x^2 + (y-1)(y-1)) / 2)
+        /// </summary>
+        /// <param name="p_vectors"></param>
+        /// <returns></returns>
+        private double getOrientation(double[,] p_vectors)
+        {
+            double x = p_vectors[0, 0];
+            double y = p_vectors[0, 1];
+
+            double a2 = x * x + (y + 1) * (y + 1);
+
+            double rads = Math.Acos(1 - a2 / 2);
+
+            //convert to degrees
+            return rads / Math.PI * 180;
         }
 
         /// <summary>

@@ -19,6 +19,7 @@ namespace MotionGestureProcessing
                                            { 0,  0,  0},
                                            { 1,  2,  1}};
 
+        #region Edge Detection
         /// <summary>
         /// use the Canny edge detection algorithm
         /// </summary>
@@ -615,5 +616,13 @@ namespace MotionGestureProcessing
                 return;
             }
         }
+        #endregion
+
+        #region Convex Hull
+        public static List<Point> getConvexHull(List<Point> p_dataPoints)
+        {
+            return new List<Point>();
+        }
+        #endregion
     }
 }

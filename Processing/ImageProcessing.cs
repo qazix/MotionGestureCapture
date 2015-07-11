@@ -621,7 +621,111 @@ namespace MotionGestureProcessing
         #region Convex Hull
         public static List<Point> getConvexHull(List<Point> p_dataPoints)
         {
+            ConvexHullObject cho = new ConvexHullObject();
+            
+            //get root points
+            getRoots(p_dataPoints, ref cho);
+
+
             return new List<Point>();
+        }
+
+        public static void getRoots(List<Point> p_dataPoints, ref ConvexHullObject p_cho)
+        {
+            int xMin, yMin, xMax, yMax;
+            xMax = yMax = 0;
+            xMin = yMin = Int32.MaxValue;
+            foreach (Point point in p_dataPoints)
+            {
+                #region Setting Left Roots
+                //If this is the leftmost point set both roots Y to its Y
+                if (point.X < xMin)
+                {
+                    p_cho.m_topLeft.Y = point.Y;
+                    p_cho.m_bottomLeft.Y = point.Y;
+                    xMin = point.X;
+                }
+                //If the X point equals the min set the Y values to the extremes
+                else if (point.X == xMin)
+                {
+                    if (point.Y < p_cho.m_topLeft.Y)
+                        p_cho.m_topLeft.Y = point.Y;
+                    else if (point.Y > p_cho.m_bottomLeft.Y)
+                        p_cho.m_bottomLeft.Y = point.Y;
+                }
+                #endregion
+                #region Setting Right Roots
+                //If this is the rightmost point set both roots Y to its Y
+                else if (point.X > xMax)
+                {
+                    p_cho.m_topRight.Y = point.Y;
+                    p_cho.m_bottomRight.Y = point.Y;
+                    xMax = point.X;
+                }
+                //If the X point equals the max, set the Y values to the extremes
+                else if (point.X == xMax)
+                {
+                    if (point.Y < p_cho.m_topRight.Y)
+                        p_cho.m_topRight.Y = point.Y;
+                    else if (point.Y > p_cho.m_bottomRight.Y)
+                        p_cho.m_bottomRight.Y = point.Y;
+                }
+                #endregion
+                #region Setting Top Roots
+                //If this is the topmost point, set both roots X to its X
+                if (point.Y < yMin)
+                {
+                    p_cho.m_topLeft.X = point.X;
+                    p_cho.m_topRight.X = point.X;
+                    yMin = point.Y;
+                }
+                //If the Y point equals the min, set the X values to the extremes
+                else if (point.Y == yMin)
+                {
+                    if (point.X < p_cho.m_topLeft.X)
+                        p_cho.m_topLeft.X = point.X;
+                    else if (point.X > p_cho.m_topRight.X)
+                        p_cho.m_topRight.X = point.X;
+                }
+                #endregion
+                #region Setting Bottom Roots
+                //If this is the bottommost point, set both roots X to its X
+                else if (point.Y > yMax)
+                {
+                    p_cho.m_bottomLeft.X = point.X;
+                    p_cho.m_bottomRight.X = point.X;
+                    yMax = point.Y;
+                }
+                //If the Y point equals the max, set the X values to the extremes
+                else if (point.Y == yMax)
+                {
+                    if (point.X < p_cho.m_bottomLeft.X)
+                        p_cho.m_bottomLeft.X = point.X;
+                    else if (point.X > p_cho.m_bottomRight.X)
+                        p_cho.m_bottomRight.X = point.X;
+                }
+                #endregion
+            }
+        }
+
+        /// <summary>
+        /// Convext Hull object holds root point and hull
+        /// </summary>
+        private class ConvexHullObject
+        {
+            //These points need to have variable so I can initialize them in a constuctor
+            public Point m_topLeft;
+            public Point m_topRight;
+            public Point m_bottomLeft;
+            public Point m_bottomRight;
+
+            public List<Point> ConvexHull { get; set; }
+
+            public ConvexHullObject()
+            { 
+                m_topLeft.X = m_bottomLeft.X = 
+                m_topLeft.Y = m_topRight.Y = Int32.MaxValue;
+            }
         }
         #endregion
     }

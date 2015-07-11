@@ -187,8 +187,7 @@ namespace MotionGestureProcessing
                 p_pcaData.eigenVectors[1, 0] = -p_pcaData.eigenVectors[0, 1];
                 p_pcaData.eigenVectors[1, 1] = p_pcaData.eigenVectors[0, 0];
             }
-
-            //else
+            else
             {
                 //second principal component
                 p_pcaData.eigenVectors[1, 0] = p_pcaData.CoVar / (p_pcaData.XVar - p_pcaData.eigenValues[1]);

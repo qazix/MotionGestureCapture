@@ -185,7 +185,7 @@ namespace ImageProcessing
                     curSlope = (double)(hullPoints[1].Y - hullPoints[0].Y) / (hullPoints[1].X - hullPoints[0].X);
 
                     //evaluate candidate slope
-                    canSlope = (double)(point.Y - hullPoints[0].Y) / (point.X - hullPoints[0].Y);
+                    canSlope = (double)(point.Y - hullPoints[0].Y) / (point.X - hullPoints[0].X);
 
                     if (canSlope < curSlope)
                     {

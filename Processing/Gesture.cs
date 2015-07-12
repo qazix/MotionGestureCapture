@@ -44,7 +44,13 @@ namespace MotionGestureProcessing
         {
             Gestures gesture = Gestures.NoGesture;
 
+            byte[] buffer;
+
             List<Point> convexHull = ImageProcess.getConvexHull(((imageData)p_imgData).Datapoints);
+
+            BitmapData data = BitmapManip.lockBitmap(out buffer, ((imageData)p_imgData).Image);
+            drawLines(buffer, data, convexHull);
+            BitmapManip.unlockBitmap(ref buffer, ref data, ((imageData)p_imgData).Image);
 
             //writeGesture(gesture);
             Processing.getInstance().ToReturnImage = (imageData)p_imgData;

@@ -127,5 +127,62 @@ namespace MotionGestureProcessing
             }
             while(valid);
         }
+
+        /// <summary>
+        /// Takes a list of points and connects the dots
+        /// </summary>
+        /// <param name="p_lines"></param>
+        protected void drawLines(byte[] p_buffer, BitmapData p_data, List<Point> p_lines)
+        {
+            int i;
+            for (i = 0; i < p_lines.Count - 1; ++i)
+            {
+                drawLine(p_buffer, p_data, p_lines[i], p_lines[i + 1]);   
+            }
+        }
+
+        /// <summary>
+        /// Actually draws the line
+        /// </summary>
+        /// <param name="p_buffer"></param>
+        /// <param name="p_data"></param>
+        /// <param name="point1"></param>
+        /// <param name="point2"></param>
+        private void drawLine(byte[] p_buffer, BitmapData p_data, Point point1, Point point2)
+        {
+            double[] curPos = new double[2];
+            curPos[0] = point1.X;
+            curPos[1] = point1.Y;
+
+            double deltaX = point2.X - point1.X;
+            double deltaY = point2.Y - point1.Y;
+
+            double len = Math.Sqrt(deltaX * deltaX + deltaY * deltaY);
+
+            deltaX /= len;
+            deltaY /= len;
+
+            int offset;
+            int depth = p_data.Stride / p_data.Width;
+            bool valid;
+            do
+            {
+                if (curPos[0] > 0 && curPos[0] < p_data.Width && 
+                    curPos[1] > 0 && curPos[1] < p_data.Height)
+                    valid = true;
+                else
+                    valid = false;
+                if (valid)
+                {
+                    offset = (((int)curPos[1] * p_data.Width) + (int)curPos[0]) * depth;
+                    p_buffer[offset + 2] = 0;
+                    p_buffer[offset] = p_buffer[offset + 1] = 255;
+
+                    curPos[0] += deltaX;
+                    curPos[1] += deltaY;
+                }
+            }
+            while (valid && (int)curPos[0] != point2.X);
+        }
     }
 }

@@ -43,13 +43,16 @@
     <Compile Include="Gesture.cs" />
     <Compile Include="HandIsolation.cs" />
     <Compile Include="imageData.cs" />
-    <Compile Include="ImageProcessing.cs" />
     <Compile Include="PCA.cs" />
     <Compile Include="Process.cs" />
     <Compile Include="Processing.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\ImageProcessing\ImageProcessing.csproj">
+      <Project>{60dd72dd-ee8f-4a7a-9fc1-a0fbe7aba012}</Project>
+      <Name>ImageProcessing</Name>
+    </ProjectReference>
     <ProjectReference Include="..\MotionGestureCapture\MotionGestureCapture.csproj">
       <Project>{f132e93a-ccb6-478a-8f52-c898c4332436}</Project>
       <Name>MotionGestureCapture</Name>

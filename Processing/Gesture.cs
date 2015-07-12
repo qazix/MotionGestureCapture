@@ -5,6 +5,7 @@ using System.Drawing.Imaging;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using ImageProcessing;
 
 namespace MotionGestureProcessing
 {
@@ -43,6 +44,7 @@ namespace MotionGestureProcessing
         {
             Gestures gesture = Gestures.NoGesture;
 
+            List<Point> convexHull = ImageProcess.getConvexHull(((imageData)p_imgData).Datapoints);
 
             //writeGesture(gesture);
             Processing.getInstance().ToReturnImage = (imageData)p_imgData;

@@ -1,4 +1,5 @@
-﻿using MotionGestureProcessing;
+﻿using ImageProcessing;
+using MotionGestureProcessing;
 using System.Drawing;
 
 namespace testing
@@ -8,7 +9,7 @@ namespace testing
         static void Main(string[] args)
         {
             Bitmap load = new Bitmap(@"D:\Documents\Temp\Demo\edgeDetection\Canny Edge Detection C#\Shrikrishna.bmp");
-            ImageProcessing.findEdges(load);
+            ImageProcess.findEdges(load);
         }
     }
 }

@@ -6,9 +6,9 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace MotionGestureProcessing
+namespace ImageProcessing
 {
-    public class ImageProcessing
+    public class ImageProcess
     {
         //Sobel filters
         private static int[,] m_xFilter = {{-1, 0, 1},
@@ -34,7 +34,7 @@ namespace MotionGestureProcessing
             Image edgeImage = new Bitmap(p_image);
             byte[] resultBuffer = new byte[edgeImage.Width * edgeImage.Height];
             byte[] pixelBuffer;
-            BitmapData data = Process.lockBitmap(out pixelBuffer, edgeImage);
+            BitmapData data = BitmapManip.lockBitmap(out pixelBuffer, edgeImage);
             convert2GreyScale(ref pixelBuffer);
 
             //step 1 blur image
@@ -42,39 +42,39 @@ namespace MotionGestureProcessing
 
             //TODO: comment this out and replace with this (pixelBuffer = resultBuffer;)
             //Check the images as I go strictly for testing
-            Process.unlockBitmap(ref resultBuffer, ref data, edgeImage);
+            BitmapManip.unlockBitmap(ref resultBuffer, ref data, edgeImage);
             edgeImage.Save("SmoothedImage.bmp");
-            data = Process.lockBitmap(out pixelBuffer, edgeImage);
+            data = BitmapManip.lockBitmap(out pixelBuffer, edgeImage);
 
             //step 2 apply sobel filters to find gradients
             float[,] angleMap = new float[edgeImage.Height, edgeImage.Width];
             findGradients(ref pixelBuffer, edgeImage.Width, ref resultBuffer, ref angleMap);
 
             //TODO: comment this out and replace with this (pixelBuffer = resultBuffer;)
-            Process.unlockBitmap(ref resultBuffer, ref data, edgeImage);
+            BitmapManip.unlockBitmap(ref resultBuffer, ref data, edgeImage);
             edgeImage.Save("FilteredImage.bmp");
-            data = Process.lockBitmap(out pixelBuffer, edgeImage);
+            data = BitmapManip.lockBitmap(out pixelBuffer, edgeImage);
 
             //step 3 clear out all non local maximum values
             nonMaxSuppression(ref pixelBuffer, edgeImage.Width, ref resultBuffer, angleMap);
 
             //TODO: comment this out and replace with this (pixelBuffer = resultBuffer;)
-            Process.unlockBitmap(ref resultBuffer, ref data, edgeImage);
+            BitmapManip.unlockBitmap(ref resultBuffer, ref data, edgeImage);
             edgeImage.Save("NonMaxSupressImage.bmp");
-            data = Process.lockBitmap(out pixelBuffer, edgeImage);
+            data = BitmapManip.lockBitmap(out pixelBuffer, edgeImage);
 
             //Step 4 dual edge thresholding
             thresholding(ref pixelBuffer, edgeImage.Width, ref resultBuffer);
 
             //thresholding doens't give a human recognizable output
-            Process.unlockBitmap(ref resultBuffer, ref data, edgeImage);
-            data = Process.lockBitmap(out pixelBuffer, edgeImage);
+            BitmapManip.unlockBitmap(ref resultBuffer, ref data, edgeImage);
+            data = BitmapManip.lockBitmap(out pixelBuffer, edgeImage);
 
             //Step 5 HysteresisThresholding
             hysterisisThresholding(ref pixelBuffer, edgeImage.Width, ref resultBuffer);
 
             //Restore byte array to image
-            Process.unlockBitmap(ref resultBuffer, ref data, edgeImage);
+            BitmapManip.unlockBitmap(ref resultBuffer, ref data, edgeImage);
             edgeImage.Save("Thresholding.bmp");
 
             return edgeImage;
@@ -619,6 +619,11 @@ namespace MotionGestureProcessing
         #endregion
 
         #region Convex Hull
+        /// <summary>
+        /// Using Liu and Chen's Convex shell algorithm to quicly find the outside points of the hand
+        /// </summary>
+        /// <param name="p_dataPoints"></param>
+        /// <returns></returns>
         public static List<Point> getConvexHull(List<Point> p_dataPoints)
         {
             ConvexHullObject cho = new ConvexHullObject();
@@ -626,11 +631,18 @@ namespace MotionGestureProcessing
             //get root points
             getRoots(p_dataPoints, ref cho);
 
+            //Get the shell in each quadrant
+            getShell(p_dataPoints, cho);
 
-            return new List<Point>();
+            return connectTheDots(cho);
         }
 
-        public static void getRoots(List<Point> p_dataPoints, ref ConvexHullObject p_cho)
+        /// <summary>
+        /// This part is to find the vertex of the extreme points thus creating 4 areas with shell points.
+        /// </summary>
+        /// <param name="p_dataPoints">data points to search</param>
+        /// <param name="p_cho">object that stores data</param>
+        private static void getRoots(List<Point> p_dataPoints, ref ConvexHullObject p_cho)
         {
             int xMin, yMin, xMax, yMax;
             xMax = yMax = 0;
@@ -641,91 +653,138 @@ namespace MotionGestureProcessing
                 //If this is the leftmost point set both roots Y to its Y
                 if (point.X < xMin)
                 {
-                    p_cho.m_topLeft.Y = point.Y;
-                    p_cho.m_bottomLeft.Y = point.Y;
+                    //I'm worried about them having references to each other 
+                    // becuase they are not always the same
+                    p_cho.m_Q2.xPoint = point;
+                    p_cho.m_Q3.xPoint = point;
+                    
                     xMin = point.X;
                 }
                 //If the X point equals the min set the Y values to the extremes
                 else if (point.X == xMin)
                 {
-                    if (point.Y < p_cho.m_topLeft.Y)
-                        p_cho.m_topLeft.Y = point.Y;
-                    else if (point.Y > p_cho.m_bottomLeft.Y)
-                        p_cho.m_bottomLeft.Y = point.Y;
+                    if (point.Y < p_cho.m_Q2.xPoint.Y)
+                    {
+                        p_cho.m_Q2.xPoint = point;
+                    }
+                    else if (point.Y > p_cho.m_Q3.xPoint.Y)
+                    {
+                        p_cho.m_Q3.xPoint = point;
+                    }
                 }
                 #endregion
                 #region Setting Right Roots
                 //If this is the rightmost point set both roots Y to its Y
                 else if (point.X > xMax)
                 {
-                    p_cho.m_topRight.Y = point.Y;
-                    p_cho.m_bottomRight.Y = point.Y;
+                    p_cho.m_Q1.xPoint = point;
+                    p_cho.m_Q4.xPoint = point;
+
                     xMax = point.X;
                 }
                 //If the X point equals the max, set the Y values to the extremes
                 else if (point.X == xMax)
                 {
-                    if (point.Y < p_cho.m_topRight.Y)
-                        p_cho.m_topRight.Y = point.Y;
-                    else if (point.Y > p_cho.m_bottomRight.Y)
-                        p_cho.m_bottomRight.Y = point.Y;
+                    if (point.Y < p_cho.m_Q1.xPoint.Y)
+                        p_cho.m_Q1.xPoint = point;
+                    else if (point.Y > p_cho.m_Q4.xPoint.Y)
+                        p_cho.m_Q4.xPoint = point;
                 }
                 #endregion
                 #region Setting Top Roots
                 //If this is the topmost point, set both roots X to its X
                 if (point.Y < yMin)
                 {
-                    p_cho.m_topLeft.X = point.X;
-                    p_cho.m_topRight.X = point.X;
+                    p_cho.m_Q1.yPoint = point;
+                    p_cho.m_Q2.yPoint = point;
                     yMin = point.Y;
                 }
                 //If the Y point equals the min, set the X values to the extremes
                 else if (point.Y == yMin)
                 {
-                    if (point.X < p_cho.m_topLeft.X)
-                        p_cho.m_topLeft.X = point.X;
-                    else if (point.X > p_cho.m_topRight.X)
-                        p_cho.m_topRight.X = point.X;
+                    if (point.X < p_cho.m_Q2.yPoint.X)
+                        p_cho.m_Q2.yPoint = point;
+                    else if (point.X > p_cho.m_Q1.yPoint.X)
+                        p_cho.m_Q1.yPoint = point;
                 }
                 #endregion
                 #region Setting Bottom Roots
                 //If this is the bottommost point, set both roots X to its X
                 else if (point.Y > yMax)
                 {
-                    p_cho.m_bottomLeft.X = point.X;
-                    p_cho.m_bottomRight.X = point.X;
+                    p_cho.m_Q3.yPoint = point;
+                    p_cho.m_Q4.yPoint = point;
                     yMax = point.Y;
                 }
                 //If the Y point equals the max, set the X values to the extremes
                 else if (point.Y == yMax)
                 {
-                    if (point.X < p_cho.m_bottomLeft.X)
-                        p_cho.m_bottomLeft.X = point.X;
-                    else if (point.X > p_cho.m_bottomRight.X)
-                        p_cho.m_bottomRight.X = point.X;
+                    if (point.X < p_cho.m_Q3.yPoint.X)
+                        p_cho.m_Q3.yPoint = point;
+                    else if (point.X > p_cho.m_Q4.yPoint.X)
+                        p_cho.m_Q4.yPoint = point;
                 }
                 #endregion
             }
         }
 
         /// <summary>
-        /// Convext Hull object holds root point and hull
+        /// prepare the data and send it off to be worked on in parallel
         /// </summary>
-        private class ConvexHullObject
+        /// <param name="p_dataPoints"></param>
+        /// <param name="p_cho"></param>
+        private static void getShell(List<Point> p_dataPoints, ConvexHullObject p_cho)
         {
-            //These points need to have variable so I can initialize them in a constuctor
-            public Point m_topLeft;
-            public Point m_topRight;
-            public Point m_bottomLeft;
-            public Point m_bottomRight;
+            List<Point> ySortedList = p_dataPoints.OrderBy(p => p.Y).ThenBy(p => p.X).ToList();
+            List<Point> xSortedList = p_dataPoints.OrderBy(p => p.Y).ThenBy(p => p.X).ToList();
+            Parallel.Invoke(
+                () =>
+                {
+                    p_cho.m_Q1.evaluate(ySortedList);
+                },
+                () =>
+                {
+                    p_cho.m_Q2.evaluate(ySortedList);
+                },
+                () => 
+                {
+                    p_cho.m_Q3.evaluate(xSortedList);
+                },
+                () =>
+                {
+                    p_cho.m_Q4.evaluate(xSortedList);
+                });
+        }
 
-            public List<Point> ConvexHull { get; set; }
+        /// <summary>
+        /// Takes all the hull points and strings them together
+        /// </summary>
+        /// <param name="p_cho"></param>
+        /// <returns></returns>
+        private static List<Point> connectTheDots(ConvexHullObject p_cho)
+        {
+            List<Point> hullPoints = new List<Point>();
 
-            public ConvexHullObject()
-            { 
-                m_topLeft.X = m_bottomLeft.X = 
-                m_topLeft.Y = m_topRight.Y = Int32.MaxValue;
-            }
+            //add all of Q1
+            hullPoints.AddRange(p_cho.m_Q1.hullPoints);
+            //remove duplicates
+            if (hullPoints.Last().Equals(p_cho.m_Q4.hullPoints.First()))
+                hullPoints.RemoveAt(hullPoints.Count - 1);
+
+            hullPoints.AddRange(p_cho.m_Q4.hullPoints);
+            if (hullPoints.Last().Equals(p_cho.m_Q3.hullPoints.First()))
+                hullPoints.RemoveAt(hullPoints.Count - 1);
+
+            hullPoints.AddRange(p_cho.m_Q3.hullPoints);
+            if (hullPoints.Last().Equals(p_cho.m_Q2.hullPoints.First()))
+                hullPoints.RemoveAt(hullPoints.Count - 1);
+
+            //rinse and repeat
+            hullPoints.AddRange(p_cho.m_Q2.hullPoints);
+            if (hullPoints.Last().Equals(hullPoints.First()))
+                hullPoints.RemoveAt(hullPoints.Count - 1);
+
+            return hullPoints;
         }
         #endregion
     }

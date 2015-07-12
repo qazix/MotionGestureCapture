@@ -1,4 +1,5 @@
-﻿using System;
+﻿using ImageProcessing;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Drawing;
@@ -42,7 +43,7 @@ namespace MotionGestureProcessing
         public void initialize(imageData p_toInit)
         {
             Image toInit = p_toInit.Image;
-            Image edges = ImageProcessing.findEdges(toInit);
+            Image edges = ImageProcess.findEdges(toInit);
 
             //Convert if edges size doesn't match given image size
             if (edges.PixelFormat != toInit.PixelFormat)
@@ -127,8 +128,8 @@ namespace MotionGestureProcessing
             int byteOffset;
             bool isEdge;
 
-            BitmapData data = lockBitmap(out buffer, p_image);
-            BitmapData edgeData = lockBitmap(out edgeBuffer, p_edges);
+            BitmapData data = BitmapManip.lockBitmap(out buffer, p_image);
+            BitmapData edgeData = BitmapManip.lockBitmap(out edgeBuffer, p_edges);
 
             //Create the points
             m_topLeft = new Point((p_image.Width / 2) - 50, (p_image.Height / 2 - 50));
@@ -227,8 +228,8 @@ namespace MotionGestureProcessing
             m_topLeft.X = x - 1;
             m_bottomLeft.X = x - 2;
 
-            unlockBitmap(ref edgeBuffer, ref edgeData, p_edges);
-            unlockBitmap(ref buffer, ref data, p_image);
+            BitmapManip.unlockBitmap(ref edgeBuffer, ref edgeData, p_edges);
+            BitmapManip.unlockBitmap(ref buffer, ref data, p_image);
         }
 
         /// <summary>
@@ -254,7 +255,7 @@ namespace MotionGestureProcessing
 
                 //Setting up a buffer to be used for concurrent read/write
                 byte[] buffer;
-                BitmapData data = lockBitmap(out buffer, ((imageData)p_imageData).Image);
+                BitmapData data = BitmapManip.lockBitmap(out buffer, ((imageData)p_imageData).Image);
 
                 //This method returns bit per pixel, we need bytes.
                 int depth = Bitmap.GetPixelFormatSize(data.PixelFormat) / 8; 
@@ -320,7 +321,7 @@ namespace MotionGestureProcessing
                 else
                     performCancellingARGB(ref buffer, data);
                 
-                unlockBitmap(ref buffer, ref data, ((imageData)p_imageData).Image);
+                BitmapManip.unlockBitmap(ref buffer, ref data, ((imageData)p_imageData).Image);
 
                 Processing.getInstance().ToPCAImage = (imageData)p_imageData;
 
@@ -560,7 +561,7 @@ namespace MotionGestureProcessing
                     else
                     {
                         //white is all 1
-                        p_buffer[offset] = p_buffer[offset + 1] = p_buffer[offset + 2] = 255;
+                        //p_buffer[offset] = p_buffer[offset + 1] = p_buffer[offset + 2] = 255;
                     }
                 }
         }
@@ -598,8 +599,8 @@ namespace MotionGestureProcessing
                     else
                     {
                         //white is all 1
-                        p_buffer[offset] = p_buffer[offset + 1] = 
-                        p_buffer[offset + 2] = p_buffer[offset + 3] = 255;
+                        //p_buffer[offset] = p_buffer[offset + 1] = 
+                        //p_buffer[offset + 2] = p_buffer[offset + 3] = 255;
                     }
                 }
         }

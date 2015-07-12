@@ -8,6 +8,7 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using ImageProcessing;
 
 namespace MotionGestureProcessing
 {
@@ -64,9 +65,9 @@ namespace MotionGestureProcessing
 
                 //Draw the center with new axes
                 byte[] buffer;
-                BitmapData data = lockBitmap(out buffer, ((imageData)p_imgData).Image);
+                BitmapData data = BitmapManip.lockBitmap(out buffer, ((imageData)p_imgData).Image);
                 drawOrientation(buffer, data, pcaData.eigenVectors, new Point((int)pcaData.XBar, (int)pcaData.YBar));                
-                unlockBitmap(ref buffer, ref data, ((imageData)p_imgData).Image);
+                BitmapManip.unlockBitmap(ref buffer, ref data, ((imageData)p_imgData).Image);
 
                 //Adjust datapoints
                 //adjustDatapoints(ref dataPoints, pcaData);

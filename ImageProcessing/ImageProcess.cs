@@ -623,7 +623,8 @@ namespace ImageProcessing
         /// Using Liu and Chen's Convex shell algorithm to quicly find the outside points of the hand
         /// </summary>
         /// <param name="p_dataPoints"></param>
-        /// <returns></returns>
+        /// <returns>List of hull points</returns>
+        /// <seealso cref="http://www.codeproject.com/Articles/775753/A-Convex-Hull-Algorithm-and-its-implementation-in"/>
         public static List<Point> getConvexHull(List<Point> p_dataPoints)
         {
             ConvexHullObject cho = new ConvexHullObject();
@@ -736,7 +737,7 @@ namespace ImageProcessing
         private static void getShell(List<Point> p_dataPoints, ConvexHullObject p_cho)
         {
             List<Point> ySortedList = p_dataPoints.OrderBy(p => p.Y).ThenBy(p => p.X).ToList();
-            List<Point> xSortedList = p_dataPoints.OrderBy(p => p.Y).ThenBy(p => p.X).ToList();
+            List<Point> xSortedList = p_dataPoints.OrderBy(p => p.X).ThenBy(p => p.Y).ToList();
             Parallel.Invoke(
                 () =>
                 {

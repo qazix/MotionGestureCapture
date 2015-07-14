@@ -255,7 +255,7 @@ namespace ImageProcessing
             foreach (Point point in p_evalPoints)
             {
                 //Becuase this is a sorted list we can ignore anything that is left of the last point added
-                if (point.X > lastEntry.X && point.Y > rootPoint.Y)
+                if (point.X >= lastEntry.X && point.Y > rootPoint.Y)
                 {
                     //With x sorting this will only ever go in index 1
                     index = 1;

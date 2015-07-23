@@ -11,6 +11,7 @@ namespace ImageProcessing
 {
     public class ImageProcess
     {
+        #region Edge Detection
         //Sobel filters
         private static int[,] m_xFilter = {{-1, 0, 1},
                                            {-2, 0, 2},
@@ -20,7 +21,6 @@ namespace ImageProcessing
                                            { 0,  0,  0},
                                            { 1,  2,  1}};
 
-        #region Edge Detection
         /// <summary>
         /// use the Canny edge detection algorithm
         /// </summary>
@@ -790,9 +790,9 @@ namespace ImageProcessing
         }
         #endregion
 
-        private static int M_REDUCTION = 2;
-
         #region Convex Defects
+        private static int M_REDUCTION = 4;
+
         /// <summary>
         /// Using snakes from each line of the hull towards the center to find
         ///  the convex defects 
@@ -812,14 +812,12 @@ namespace ImageProcessing
             populateSnakeMap(ref snakeMap, p_interiorPoints);
 
             Point[] reducedConvexHull = p_convexHull.ToArray();
-            Point start;
-            Point end;
 
             for (int i = 0; i < p_convexHull.Count; ++i)
             {
-                start = new Point(reducedConvexHull[i].X /= M_REDUCTION,
+                Point start = new Point(reducedConvexHull[i].X /= M_REDUCTION,
                                   reducedConvexHull[i].Y /= M_REDUCTION);
-                end = new Point(reducedConvexHull[(i + 1) % p_convexHull.Count].X /= M_REDUCTION,
+                Point end = new Point(reducedConvexHull[(i + 1) % p_convexHull.Count].X /= M_REDUCTION,
                                 reducedConvexHull[(i + 1) % p_convexHull.Count].Y /= M_REDUCTION);
 
                 //Start a task for each line in the hull to find 

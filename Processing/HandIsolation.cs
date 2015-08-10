@@ -30,6 +30,16 @@ namespace MotionGestureProcessing
         Point m_bottomRight;
         Rectangle m_filterArea;
 
+        //points further from the current point are most significant because there are so many ppi
+        private static int[,] INVGAUSFILTER = {{46, 23, 13, 8, 13, 23, 46},
+                                               {23, 10,  5, 3,  5, 10, 23},
+                                               {13,  5,  2, 1,  2,  5, 13},
+                                               { 8,  3,  1, 0,  1,  3,  8},
+                                               {13,  5,  2, 1,  2,  5, 13},
+                                               {23, 10,  5, 3,  5, 10, 23},
+                                               {46, 23, 13, 8, 13, 23, 46}};
+        private static double GSUM = 608.0;
+
         /// <summary>
         /// Empty constructor
         /// </summary>
@@ -109,8 +119,6 @@ namespace MotionGestureProcessing
         {
             m_isoImageHandler = (obj) =>
             {
-                //Thread t = new Thread(new ParameterizedThreadStart(doWork));
-                //t.Start(obj);
                 doWork(obj);
             };
 
@@ -181,28 +189,8 @@ namespace MotionGestureProcessing
             m_topRight.X = x - 1;
             m_bottomRight.X = x - 2;
 
-            /* Expanding down i troublesome becuase of shadow edges
-            #region Expand Down
-            isEdge = false;
-            for (y = m_bottomLeft.Y; isEdge == false && y < p_image.Height - 3; ++y)
-                for (x = m_bottomLeft.X; x < m_bottomRight.X && isEdge == false; ++x)
-                {
-                    byteOffset = ((y * p_image.Width) + x) * 4;
+            /* Expanding down is troublesome becuase of shadow edges */
 
-                    //is an edge
-                    if (edgeBuffer[byteOffset] > 0)
-                        isEdge = true;
-                    else
-                    {
-                        m_validPixels.Add(Color.FromArgb(buffer[byteOffset + 2], buffer[byteOffset + 1],
-                                                         buffer[byteOffset]).ToArgb());
-                    }
-                }
-            #endregion
-
-            m_bottomRight.Y = y - 1;
-            m_bottomLeft.Y = y - 2;
-            */
             #region Expand Left
 
             isEdge = false;
@@ -309,9 +297,10 @@ namespace MotionGestureProcessing
                         });
                 #endregion
 
-                ((imageData)p_imageData).Datapoints = getDataPoints(buffer, data);
+                ((imageData)p_imageData).Datapoints = getDataPoints(ref data, ref buffer);
 
                 findHand((imageData)p_imageData, data, buffer);
+                filterNoise(((imageData)p_imageData).Datapoints, ref data, ref buffer);
                 ((imageData)p_imageData).Filter = m_filterArea;
                 //drawCenter(buffer, data, m_center);
 
@@ -347,11 +336,20 @@ namespace MotionGestureProcessing
             int[] xSmoothed = new int[p_data.Width];
             int[] ySmoothed = new int[p_data.Height];
 
+            int xMax, yMax;
+            xMax = yMax = 0;
+
             //Popluate histogram for x and y intesities
             foreach (Point point in p_imageData.Datapoints)
             {
                 ++xProjection[point.X];
                 ++yProjection[point.Y];
+                
+                //Because each point in the histogram is only increasing by one i can get away with this
+                if (xProjection[point.X] > xMax)
+                    ++xMax;
+                if (yProjection[point.Y] > yMax)
+                    ++yMax;
             }
 
             #region Smoothing
@@ -370,19 +368,19 @@ namespace MotionGestureProcessing
             Parallel.Invoke(
                 () =>
                 {
-                    findBound(ref yTopBound, ySmoothed, -1, m_filterArea.Width / 4, true);
+                    findBound(ref yTopBound, ySmoothed, -1, m_filterArea.Width / 8, true); 
                 },
                 () =>
                 {
-                    findBound(ref yBottomBound, ySmoothed, 1, m_filterArea.Width / 4, true);
+                    findBound(ref yBottomBound, ySmoothed, 1, m_filterArea.Width / 8, true); 
                 },
                 () =>
                 {
-                    findBound(ref xLeftBound, xSmoothed, -1, m_filterArea.Height / 4, true);
+                    findBound(ref xLeftBound, xSmoothed, -1, m_filterArea.Height / 8, true); 
                 },
                 () =>
                 {
-                    findBound(ref xRightBound, xSmoothed, 1, m_filterArea.Height / 4, true);
+                    findBound(ref xRightBound, xSmoothed, 1, m_filterArea.Height / 8, true); 
                 });
             #endregion
 
@@ -393,7 +391,7 @@ namespace MotionGestureProcessing
             closest.X = (xLeftBound + xRightBound) / 2;
             closest.Y = (yTopBound + yBottomBound) / 2;
 
-            //Rectangles X and Y are based on the tip right so adjustment is necesary
+            //Rectangles X and Y are based on the top right so adjustment is necesary
             m_filterArea.X = closest.X - m_filterArea.Width / 2;
             m_filterArea.Y = closest.Y - m_filterArea.Height / 2;
 
@@ -454,8 +452,34 @@ namespace MotionGestureProcessing
 
             //Update center and filter
             m_center = new Point(closest.X, closest.Y);
+
             m_filterArea.X = m_center.X - m_filterArea.Width / 2;
             m_filterArea.Y = m_center.Y - m_filterArea.Height / 2;
+        }
+
+        /// <summary>
+        /// goes through each datapoint and checks it's neighbors for strength if the strength is too low it is erased
+        /// </summary>
+        /// <param name="p_dataPoints">dataPoints within the filter</param>
+        /// <param name="p_data"></param>
+        /// <param name="p_buffer"></param>
+        private void filterNoise(List<Point> p_dataPoints, ref BitmapData p_data, ref byte[] p_buffer)
+        {
+            List<Point> strongPoints = new List<Point>();
+            List<Point> weakPoints = new List<Point>();
+            double strength;
+
+            foreach (Point point in p_dataPoints)
+            {
+                strength = getStrength(point, ref p_data, ref p_buffer);
+                if (strength > .5)
+                    strongPoints.Add(point);
+                else
+                    weakPoints.Add(point);
+            }
+
+            removePoints(ref weakPoints, ref p_data, ref p_buffer);
+            p_dataPoints = strongPoints;
         }
 
         /// <summary>
@@ -509,7 +533,7 @@ namespace MotionGestureProcessing
         /// <param name="p_buffer">image as bytes</param>
         /// <param name="p_data">BitmapData</param>
         /// <returns>list of (x, y) tuples</returns>
-        private List<Point> getDataPoints(byte[] p_buffer, BitmapData p_data)
+        private List<Point> getDataPoints(ref BitmapData p_data, ref byte[] p_buffer)
         {
             int x, y;
             int depth = p_data.Stride / p_data.Width;
@@ -528,6 +552,63 @@ namespace MotionGestureProcessing
             }
 
             return dataPoints;
+        }
+
+        /// <summary>
+        /// remove points from p_buffer that were too weak
+        /// </summary>
+        /// <param name="p_dataPoints"></param>
+        /// <param name="p_data"></param>
+        /// <param name="p_buffer"></param>
+        private void removePoints(ref List<Point> p_dataPoints, ref BitmapData p_data, ref byte[] p_buffer)
+        {
+            int depth = p_data.Stride / p_data.Width;
+            int offset;
+
+            foreach (Point point in p_dataPoints)
+            {
+                offset = ((point.Y * p_data.Width) + point.X) * depth;
+                p_buffer[offset] = p_buffer[offset + 1] = p_buffer[offset + 2] = 0;
+            }
+        }
+
+        /// <summary>
+        /// evaluates neighboring points and returns the value of neighboring points
+        /// </summary>
+        /// <param name="p_point"></param>
+        /// <param name="p_data"></param>
+        /// <param name="p_buffer"></param>
+        /// <returns></returns>
+        private double getStrength(Point p_point, ref BitmapData p_data, ref byte[] p_buffer)
+        {
+            int depth = p_data.Stride / p_data.Width;
+            int window = INVGAUSFILTER.GetLength(0) / 2;
+            int yStart, yEnd, xStart, xEnd;
+            yStart = (p_point.Y - window) * p_data.Stride;
+            yEnd = (p_point.Y + window) * p_data.Stride;
+            xStart = (p_point.X - window) * depth;
+            xEnd = (p_point.X + window) * depth;
+
+            if (p_point.X < window || p_point.X >= p_data.Width - window ||
+                p_point.Y < window || p_point.Y >= p_data.Height - window)
+                return 0.0;
+
+            double sum = 0.0;
+
+            int i, j;
+            i = 0;
+            for (int y = yStart; y <= yEnd; y += p_data.Stride, ++i)
+            {
+                j = 0;
+                for (int x = xStart; x <= xEnd; x += depth, ++j)
+                {
+                    //If the point has any color in it add the filters value to the sum
+                    if (p_buffer[y + x] != 0 || p_buffer[y + x + 1] != 0 || p_buffer[y + x + 1] != 0)
+                        sum += INVGAUSFILTER[i, j];
+                }
+            }
+
+            return sum / GSUM;
         }
 
         /// <summary>

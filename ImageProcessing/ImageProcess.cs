@@ -44,7 +44,7 @@ namespace ImageProcessing
             //TODO: comment this out and replace with this (pixelBuffer = resultBuffer;)
             //Check the images as I go strictly for testing
             BitmapManip.unlockBitmap(ref resultBuffer, ref data, edgeImage);
-            edgeImage.Save("SmoothedImage.bmp");
+            //edgeImage.Save("SmoothedImage.bmp");
             data = BitmapManip.lockBitmap(out pixelBuffer, edgeImage);
 
             //step 2 apply sobel filters to find gradients
@@ -53,7 +53,7 @@ namespace ImageProcessing
 
             //TODO: comment this out and replace with this (pixelBuffer = resultBuffer;)
             BitmapManip.unlockBitmap(ref resultBuffer, ref data, edgeImage);
-            edgeImage.Save("FilteredImage.bmp");
+            //edgeImage.Save("FilteredImage.bmp");
             data = BitmapManip.lockBitmap(out pixelBuffer, edgeImage);
 
             //step 3 clear out all non local maximum values
@@ -61,7 +61,7 @@ namespace ImageProcessing
 
             //TODO: comment this out and replace with this (pixelBuffer = resultBuffer;)
             BitmapManip.unlockBitmap(ref resultBuffer, ref data, edgeImage);
-            edgeImage.Save("NonMaxSupressImage.bmp");
+            //edgeImage.Save("NonMaxSupressImage.bmp");
             data = BitmapManip.lockBitmap(out pixelBuffer, edgeImage);
 
             //Step 4 dual edge thresholding

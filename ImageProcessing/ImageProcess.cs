@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -61,7 +62,7 @@ namespace ImageProcessing
 
             //TODO: comment this out and replace with this (pixelBuffer = resultBuffer;)
             BitmapManip.unlockBitmap(ref resultBuffer, ref data, edgeImage);
-            //edgeImage.Save("NonMaxSupressImage.bmp");
+            //scan0edgeImage.Save("NonMaxSupressImage.bmp");
             data = BitmapManip.lockBitmap(out pixelBuffer, edgeImage);
 
             //Step 4 dual edge thresholding
@@ -860,5 +861,21 @@ namespace ImageProcessing
             throw new NotImplementedException();
         }
         #endregion
+
+        #region Other Tools
+        
+        /// <summary>
+        /// This returns the place in the image
+        /// </summary>
+        /// <param name="p_x"></param>
+        /// <param name="p_y"></param>
+        /// <param name="p_data">Bitmap data of image x and y are within</param>
+        /// <returns></returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static public int getOffset(int p_x, int p_y, int p_width, int p_depth)
+        {
+            return ((p_y * p_width) + p_x) * p_depth;
+        }
+        #endregion  
     }
 }

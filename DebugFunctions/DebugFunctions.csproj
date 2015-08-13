@@ -4,11 +4,11 @@
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>{4D67ACD5-CF0E-47E1-87E4-4A180A14DC55}</ProjectGuid>
+    <ProjectGuid>{FE9A9067-4594-4C20-95AF-15A0AF8002BD}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>MotionGestureProcessing</RootNamespace>
-    <AssemblyName>Processing</AssemblyName>
+    <RootNamespace>DebugFunctions</RootNamespace>
+    <AssemblyName>DebugFunctions</AssemblyName>
     <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
   </PropertyGroup>
@@ -40,27 +40,8 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Gesture.cs" />
-    <Compile Include="HandIsolation.cs" />
-    <Compile Include="imageData.cs" />
-    <Compile Include="PCA.cs" />
-    <Compile Include="Process.cs" />
-    <Compile Include="Processing.cs" />
+    <Compile Include="DebugBuffer.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\DebugFunctions\DebugFunctions.csproj">
-      <Project>{fe9a9067-4594-4c20-95af-15a0af8002bd}</Project>
-      <Name>DebugFunctions</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\ImageProcessing\ImageProcessing.csproj">
-      <Project>{60dd72dd-ee8f-4a7a-9fc1-a0fbe7aba012}</Project>
-      <Name>ImageProcessing</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\MotionGestureCapture\MotionGestureCapture.csproj">
-      <Project>{f132e93a-ccb6-478a-8f52-c898c4332436}</Project>
-      <Name>MotionGestureCapture</Name>
-    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

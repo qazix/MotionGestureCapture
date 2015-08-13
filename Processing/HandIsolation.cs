@@ -1,4 +1,5 @@
 ﻿using ImageProcessing;
+using DebugFunctions;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -301,6 +302,9 @@ namespace MotionGestureProcessing
 
                 findHand((imageData)p_imageData, data, buffer);
                 filterNoise(((imageData)p_imageData).Datapoints, ref data, ref buffer);
+                strengthenSignal(ref data, ref buffer);
+
+
                 ((imageData)p_imageData).Filter = m_filterArea;
                 //drawCenter(buffer, data, m_center);
 
@@ -309,6 +313,8 @@ namespace MotionGestureProcessing
                     performCancellingRGB(ref buffer, data);
                 else
                     performCancellingARGB(ref buffer, data);
+
+                ((imageData)p_imageData).Datapoints = getDataPoints(ref data, ref buffer);
                 
                 BitmapManip.unlockBitmap(ref buffer, ref data, ((imageData)p_imageData).Image);
 
@@ -483,6 +489,64 @@ namespace MotionGestureProcessing
         }
 
         /// <summary>
+        /// Widens the points that survived the filtering
+        /// </summary>
+        /// <param name="p_data"></param>
+        /// <param name="p_buffer"></param>
+        private void strengthenSignal(ref BitmapData p_data, ref byte[] p_buffer)
+        {
+            //setup 
+            int strengthenValue = 7;
+            bool ranLastIteration = false;
+            byte[] newBuffer = new byte[p_buffer.Length];
+
+            //copy our original buffer to include 
+            Buffer.BlockCopy(p_buffer, 0, newBuffer, 0, p_buffer.Length);
+
+            int depth = p_data.Stride / p_data.Width;
+            int trueOffset, curOffset;
+
+            //iterate accross image
+            for (int trueY = 0; trueY < p_data.Height; ++trueY)
+                for (int trueX = 0; trueX < p_data.Width; ++trueX)
+                {
+                    trueOffset = ImageProcess.getOffset(trueX, trueY, p_data.Width, depth);
+
+                    //iterate accross window
+                    if (p_buffer[trueOffset] != 0 || p_buffer[trueOffset + 1] != 0 || p_buffer[trueOffset + 2] != 0)
+                    {
+                        for (int y = (trueY - strengthenValue > 0 ? -strengthenValue : -trueY); y <= strengthenValue && trueY + y < p_data.Height; ++y)
+                        {
+                            //if the last pixel ran then i only need to update the far right edge
+                            if (!ranLastIteration)
+                                for (int x = (trueX - strengthenValue > 0 ? -strengthenValue : -trueX); x <= strengthenValue && trueX + x < p_data.Width; ++x)
+                                {
+                                    curOffset = ImageProcess.getOffset(trueX + x, trueY + y, p_data.Width, depth);
+                                    newBuffer[curOffset] = newBuffer[curOffset + 1] = newBuffer[curOffset + 2] = 255;
+                                    if (depth == 4)
+                                        newBuffer[curOffset + 3] = 255;
+                                }
+                            else if (trueX + strengthenValue < p_data.Width)
+                            {
+                                curOffset = ImageProcess.getOffset(trueX + strengthenValue, trueY + y, p_data.Width, depth);
+                                newBuffer[curOffset] = newBuffer[curOffset + 1] = newBuffer[curOffset + 2] = 255;
+                                if (depth == 4)
+                                    newBuffer[curOffset + 3] = 255;
+                            }
+                        }
+
+                        ranLastIteration = true;
+                    }
+                    else
+                        ranLastIteration = false;
+                }
+
+            int validPixels = DebugFunctions.DebugBuffer.getValidPixels(ref p_data, ref newBuffer);
+            //copy the new buffer into the old
+            Buffer.BlockCopy(newBuffer, 0, p_buffer, 0, p_buffer.Length);
+        }
+
+        /// <summary>
         /// Find bounds of a threshold
         /// </summary>
         /// <param name="p_start">starting index</param>
@@ -603,7 +667,7 @@ namespace MotionGestureProcessing
                 for (int x = xStart; x <= xEnd; x += depth, ++j)
                 {
                     //If the point has any color in it add the filters value to the sum
-                    if (p_buffer[y + x] != 0 || p_buffer[y + x + 1] != 0 || p_buffer[y + x + 1] != 0)
+                    if (p_buffer[y + x] != 0)// || p_buffer[y + x + 1] != 0 || p_buffer[y + x + 1] != 0)
                         sum += INVGAUSFILTER[i, j];
                 }
             }

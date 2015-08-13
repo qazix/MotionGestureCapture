@@ -301,10 +301,8 @@ namespace MotionGestureProcessing
                 ((imageData)p_imageData).Datapoints = getDataPoints(ref data, ref buffer);
 
                 findHand((imageData)p_imageData, data, buffer);
-                filterNoise(((imageData)p_imageData).Datapoints, ref data, ref buffer);
-                strengthenSignal(ref data, ref buffer);
 
-
+                //Provide wide area filtering
                 ((imageData)p_imageData).Filter = m_filterArea;
                 //drawCenter(buffer, data, m_center);
 
@@ -313,6 +311,12 @@ namespace MotionGestureProcessing
                     performCancellingRGB(ref buffer, data);
                 else
                     performCancellingARGB(ref buffer, data);
+
+                ((imageData)p_imageData).Datapoints = getDataPoints(ref data, ref buffer);
+
+                //Provide finer area filtering and signal enhancing
+                filterNoise(((imageData)p_imageData).Datapoints, ref data, ref buffer);
+                strengthenSignal(ref data, ref buffer);
 
                 ((imageData)p_imageData).Datapoints = getDataPoints(ref data, ref buffer);
                 

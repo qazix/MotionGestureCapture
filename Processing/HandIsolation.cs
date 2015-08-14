@@ -500,7 +500,7 @@ namespace MotionGestureProcessing
         private void strengthenSignal(ref BitmapData p_data, ref byte[] p_buffer)
         {
             //setup 
-            int strengthenValue = 7;
+            int strengthenValue = 3;
             bool ranLastIteration = false;
             byte[] newBuffer = new byte[p_buffer.Length];
 

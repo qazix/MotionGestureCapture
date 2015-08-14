@@ -52,16 +52,17 @@ namespace MotionGestureProcessing
             drawLines(buffer, data, convexHull);
             BitmapManip.unlockBitmap(ref buffer, ref data, ((imageData)p_imgData).Image);
             
-            //data = BitmapManip.lockBitmap(out buffer, ((imageData)p_imgData).Image);
-            //((imageData)p_imgData).Image.Save("convexhull.bmp");
-            //BitmapManip.unlockBitmap(ref buffer, ref data, ((imageData)p_imgData).Image);
+            
+            data = BitmapManip.lockBitmap(out buffer, ((imageData)p_imgData).Image);
+            ((imageData)p_imgData).Image.Save("convexhull.bmp");
+            BitmapManip.unlockBitmap(ref buffer, ref data, ((imageData)p_imgData).Image);
             
 
-            //List<Point> convexDefects = ImageProcess.getConvexDefects(convexHull, ((imageData)p_imgData).Datapoints,
-            //                                              new Size(((imageData)p_imgData).Image.Width,
-            //                                                       ((imageData)p_imgData).Image.Height));
+            List<Point> convexDefects = ImageProcess.getConvexDefects(convexHull, ((imageData)p_imgData).Datapoints,
+                                                          new Size(((imageData)p_imgData).Image.Width,
+                                                                   ((imageData)p_imgData).Image.Height));
 
-
+            
             //writeGesture(gesture);
             Processing.getInstance().ToReturnImage = (imageData)p_imgData;
         }

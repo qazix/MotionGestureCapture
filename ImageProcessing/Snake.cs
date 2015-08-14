@@ -38,6 +38,8 @@ namespace ImageProcessing
             double deltaY = m_end.Y - m_start.Y;
 
             double len = Math.Sqrt(deltaX * deltaX + deltaY * deltaY);
+            if (len < 2)
+                return;
 
             //parallel angles are -1/slope = run/rise
             double[] direction = new double[2];
@@ -183,12 +185,12 @@ namespace ImageProcessing
                 if (m_next != null && !m_next.Locked)
                 {
                     m_next.m_direction = this.m_direction;
-                    //setOrbit(ref m_next);
+                    setOrbit(ref m_next);
                 }
                 if (m_prev != null && !m_prev.Locked)
                 {
                     m_prev.m_direction = this.m_direction;
-                    //setOrbit(ref m_prev);
+                    setOrbit(ref m_prev);
                 }
                 return;
             }

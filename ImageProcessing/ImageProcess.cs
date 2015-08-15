@@ -82,29 +82,7 @@ namespace ImageProcessing
             return edgeImage;
         }
 
-        /// <summary>
-        /// converts image to greyscale
-        /// </summary>
-        /// <param name="pixelBuffer">Buffer array to convert</param>
-        private static void convert2GreyScale(ref byte[] pixelBuffer)
-        {
-            float rgb;
 
-            for (int i = 0; i < pixelBuffer.Length; i += 4)
-            {
-                //grey scale transform is .2R + .59G + .11B
-                /*rgb = pixelBuffer[i] * 0.11f;
-                rgb += pixelBuffer[i + 1] * 0.59f;
-                rgb += pixelBuffer[i + 2] * .2f;*/
-
-                rgb = pixelBuffer[i] * 0.3f;
-                rgb += pixelBuffer[i + 1] * 0.3f;
-                rgb += pixelBuffer[i + 2] * .3f;
-
-                pixelBuffer[i] = pixelBuffer[i + 1] = pixelBuffer[i + 2] = (byte)rgb;
-                pixelBuffer[i + 3] = 255;
-            }
-        }
 
         /// <summary>
         /// The first step of Canny edge detection
@@ -405,69 +383,7 @@ namespace ImageProcessing
                 }
         }
 
-        /// <summary>
-        /// Otsu wanted a dynamic means of finding a good threshold in image processing
-        /// I can only barely grasp what this actually does so the comments are lacking
-        /// </summary>
-        /// <seealso cref="https://en.wikipedia.org/wiki/Otsu%27s_method"/>
-        /// <param name="p_image">Image to evaluate</param>
-        /// <returns></returns>
-        private static float otsuThreshold(byte[] p_image)
-        {
-            int total = p_image.Length / 4; //total is pixels in the image
-            int[] histogram = new int[256]; //a byte only has 256 values
-
-            //populate histogram
-            for (int i = 0; i < total; ++i)
-            {
-                //increment the histogram for each pixel value
-                //I use i * 4 because the compiler will convert it to i << 2 which is 
-                // faster than adding 4 every iteration
-                ++histogram[p_image[i * 4]];
-            }
-
-            int omegaB, omegaF, sum, sumB;
-            float mewB, mewF, max, threshold1, threshold2, between;
-
-            omegaB = omegaF = sum = sumB = 0;
-            mewB = mewF = max = threshold1 = threshold2 = between = 0;
-
-            //Populate a sum, this is multiplied by i for uniqueness
-            for (int i = 0; i < histogram.Length; ++i)
-                sum += i * histogram[i];
-
-            for (int i = 0; i < histogram.Length; ++i)
-            {
-                //add the current value to omegaB
-                omegaB += histogram[i];
-                if (omegaB == 0)
-                    continue;
-
-                //omegaF is the complement of omegaB
-                omegaF = total - omegaB;
-                if (omegaF == 0)
-                    break;
-
-                //SumB uses the same process as sum to track progress
-                sumB += i * histogram[i];
-                mewB = sumB / omegaB;
-                mewF = (sum - sumB) / omegaF;
-
-                //From here down I'm lost
-                between = omegaB * omegaF * (mewB - mewF) * (mewB - mewF);
-
-                if (between >= max)
-                {
-                    threshold1 = i;
-                    if (between > max)
-                        threshold2 = i;
-
-                    max = between;
-                }
-            }
-
-            return (threshold1 + threshold2) / 2;
-        }
+        
 
         /// <summary>
         /// 
@@ -863,7 +779,114 @@ namespace ImageProcessing
         #endregion
 
         #region Other Tools
-        
+        /// <summary>
+        /// converts image to greyscale
+        /// </summary>
+        /// <param name="pixelBuffer">Buffer array to convert</param>
+        public static void convert2GreyScale(ref byte[] pixelBuffer)
+        {
+            float rgb;
+
+            for (int i = 0; i < pixelBuffer.Length; i += 4)
+            {
+                //grey scale transform is .2R + .59G + .11B
+                rgb = pixelBuffer[i] * 0.11f;
+                rgb += pixelBuffer[i + 1] * 0.59f;
+                rgb += pixelBuffer[i + 2] * .2f;
+
+                /*rgb = pixelBuffer[i] * 0.3f;
+                rgb += pixelBuffer[i + 1] * 0.3f;
+                rgb += pixelBuffer[i + 2] * .3f;*/
+
+                pixelBuffer[i] = pixelBuffer[i + 1] = pixelBuffer[i + 2] = (byte)rgb;
+                pixelBuffer[i + 3] = 255;
+            }
+        }
+
+        /// <summary>
+        /// This uses the two pass method to search for blobs
+        /// </summary>
+        /// <seealso cref="https://en.wikipedia.org/wiki/Connected-component_labeling"/>
+        /// <param name="p_data"></param>
+        /// <param name="p_buffer"></param>
+        /// <returns>All blobs found from search</returns>
+        static public Dictionary<int, List<Point>> findBlobs(ref BitmapData p_data, ref byte[] p_buffer)
+        {
+            Dictionary<int, List<Point>> blobs = new Dictionary<int,List<Point>>();
+            //Create and populate a binary map
+            int[,] binMap = new int[p_data.Height, p_data.Width];
+
+            for (int i = 0; i < p_buffer.Length; i += 4)
+                if (p_buffer[i] != 0)
+                    binMap[i / p_data.Stride, (i % p_data.Stride) / 4] = 1;
+
+            //curLabel is not instantiated here because the first pixel will never have a point to the left or above it.
+            //  Therefore it will be instantiated before I use it.
+            ComponentLabel curLabel = null; 
+
+            #region First Pass
+            HashSet<int> searchSpace = new HashSet<int>();
+            int min;
+            //iterate through binmap and find foreground pixels
+            for (int y = 1; y < p_data.Height; ++y)
+                for (int x = 1; x < p_data.Width - 1; ++x)
+                {
+                    if (binMap[y, x] == 1)
+                    {
+                        for (int i = 0; i < 4; ++i)
+                            searchSpace.Add(binMap[i / 3, i % 3]);
+
+                        searchSpace.Remove(0);
+                        switch (searchSpace.Count)
+                        {
+                            case 0:
+                                curLabel = ComponentLabel.getInstance();
+                                break;
+
+                            case 1:
+                                if (curLabel.Id != searchSpace.First())
+                                    curLabel = ComponentLabel.getInstance(searchSpace.First());
+                                break;
+
+                            case 2: //This is gaurenteed to be two different values from left and top right
+                                min = searchSpace.Min();
+                                if (curLabel.Id != min)
+                                    curLabel = ComponentLabel.getInstance(min);
+
+                                ComponentLabel.getInstance(searchSpace.Max()).Parent = curLabel;
+                                break;
+
+                            default:
+                                throw new Exception("3 distinct values in blob detection");
+                        }
+
+                        searchSpace.Clear();
+                        binMap[y, x] = curLabel.Id;
+                    }
+                }
+            #endregion
+            #region Second Pass
+            for (int y = 1; y < p_data.Height; ++y)
+                for (int x = 1; x < p_data.Width - 1; ++x)
+                {
+                    if (binMap[y, x] != 0)
+                    {
+                        if (binMap[y, x] != curLabel.Id)
+                            curLabel = ComponentLabel.getInstance(binMap[y, x]);
+
+                        if (!blobs.ContainsKey(curLabel.Id))
+                            blobs[curLabel.EldestId] = new List<Point>();
+
+                        blobs[curLabel.EldestId].Add(new Point(x, y));
+                    }
+                }
+            #endregion
+
+            
+
+            return blobs;
+        }
+
         /// <summary>
         /// This returns the place in the image
         /// </summary>
@@ -875,6 +898,70 @@ namespace ImageProcessing
         static public int getOffset(int p_x, int p_y, int p_width, int p_depth)
         {
             return ((p_y * p_width) + p_x) * p_depth;
+        }
+
+        /// <summary>
+        /// Otsu wanted a dynamic means of finding a good threshold in image processing
+        /// I can only barely grasp what this actually does so the comments are lacking
+        /// </summary>
+        /// <seealso cref="https://en.wikipedia.org/wiki/Otsu%27s_method"/>
+        /// <param name="p_image">Image to evaluate</param>
+        /// <returns></returns>
+        public static float otsuThreshold(byte[] p_image)
+        {
+            int total = p_image.Length / 4; //total is pixels in the image
+            int[] histogram = new int[256]; //a byte only has 256 values
+
+            //populate histogram
+            for (int i = 0; i < total; ++i)
+            {
+                //increment the histogram for each pixel value
+                //I use i * 4 because the compiler will convert it to i << 2 which is 
+                // faster than adding 4 every iteration
+                ++histogram[p_image[i * 4]];
+            }
+
+            int omegaB, omegaF, sum, sumB;
+            float mewB, mewF, max, threshold1, threshold2, between;
+
+            omegaB = omegaF = sum = sumB = 0;
+            mewB = mewF = max = threshold1 = threshold2 = between = 0;
+
+            //Populate a sum, this is multiplied by i for uniqueness
+            for (int i = 0; i < histogram.Length; ++i)
+                sum += i * histogram[i];
+
+            for (int i = 0; i < histogram.Length; ++i)
+            {
+                //add the current value to omegaB
+                omegaB += histogram[i];
+                if (omegaB == 0)
+                    continue;
+
+                //omegaF is the complement of omegaB
+                omegaF = total - omegaB;
+                if (omegaF == 0)
+                    break;
+
+                //SumB uses the same process as sum to track progress
+                sumB += i * histogram[i];
+                mewB = sumB / omegaB;
+                mewF = (sum - sumB) / omegaF;
+
+                //From here down I'm lost
+                between = omegaB * omegaF * (mewB - mewF) * (mewB - mewF);
+
+                if (between >= max)
+                {
+                    threshold1 = i;
+                    if (between > max)
+                        threshold2 = i;
+
+                    max = between;
+                }
+            }
+
+            return (threshold1 + threshold2) / 2;
         }
         #endregion  
     }

@@ -15,16 +15,15 @@ using System.Threading.Tasks;
 
 namespace MotionGestureProcessing
 {
-    class HandIsolation : Process
+    class HandIsolationOld : Process
     {
         public delegate void ProcessReadyHandler();
         public event ProcessReadyHandler ProcessReady;
 
         private Processing.ImageReadyHandler m_isoImageHandler;
+        private static HashSet<int> m_validPixels;
         private static bool m_isInitialized;
         private static Point m_center;
-        private static byte[] m_backGround;
-        private int m_threshold;
 
         Point m_topLeft;
         Point m_topRight;
@@ -45,7 +44,7 @@ namespace MotionGestureProcessing
         /// <summary>
         /// Empty constructor
         /// </summary>
-        public HandIsolation()
+        public HandIsolationOld()
         { }
 
         /// <summary>
@@ -55,16 +54,23 @@ namespace MotionGestureProcessing
         public void initialize(imageData p_toInit)
         {
             Image toInit = p_toInit.Image;
+            Image edges = ImageProcess.findEdges(toInit);
 
-            convert2PixelFormat(ref toInit);
-            //convert background to greyscale and get threshold from image
-            BitmapData data = BitmapManip.lockBitmap(out m_backGround, toInit);
-            ImageProcess.convert2GreyScale(ref m_backGround);
-            m_threshold = (int)ImageProcess.otsuThreshold(m_backGround) / 8;
-            BitmapManip.unlockBitmap(ref m_backGround, ref data, toInit);
+            //Convert if edges size doesn't match given image size
+            if (edges.PixelFormat != toInit.PixelFormat)
+            {
+                convert2PixelFormat(ref toInit);
+                p_toInit.Image = toInit;
+            }
 
+            m_isInitialized = false;
+            populateValidPixels(toInit, edges);
+            setupFilter();
+            m_center = new Point(toInit.Width / 2, toInit.Height / 2);
             m_isInitialized = true;
+            
             setupListener();
+            doWork(p_toInit);
         }
 
         /// <summary>
@@ -80,6 +86,34 @@ namespace MotionGestureProcessing
         }
 
         /// <summary>
+        /// Will populate the bitArray
+        /// </summary>
+        /// <param name="p_toInit">Image to scan</param>
+        private void populateValidPixels(Image p_toInit, Image p_edges)
+        {
+            //Clear out an old but array
+            if (m_validPixels != null)
+                m_validPixels = null;
+
+            m_validPixels = new HashSet<int>();
+
+            //Take a small window and set valid hand pixels
+            //TODO i need to come up with a spreading algorithm to get more hand pixels
+            int height = ((Bitmap)p_toInit).Height;
+            int width = ((Bitmap)p_toInit).Width;
+            Rectangle window = new Rectangle((width / 2 - 50), (height / 2 - 50), 100, 100);
+
+            for (int y = window.Top; y < window.Bottom; ++y)
+                 for (int x = window.Left; x < window.Right; ++x)
+                {
+                    Color color = ((Bitmap)p_toInit).GetPixel(x, y);
+                    m_validPixels.Add(color.ToArgb());
+                }
+
+            expandSelection(p_toInit, p_edges);
+        }
+
+        /// <summary>
         /// Establishes a listening connection 
         /// </summary>
         protected override void setupListener()
@@ -91,6 +125,101 @@ namespace MotionGestureProcessing
 
             Processing.getInstance().IsolationImageFilled += m_isoImageHandler;
         }    
+
+        /// <summary>
+        /// Run vertically and horizantally from center until meeting an edge
+        /// </summary>
+        /// <param name="p_image"></param>
+        private void expandSelection(Image p_image, Image p_edges)
+        {
+            byte[] buffer;
+            byte[] edgeBuffer;
+            int byteOffset;
+            bool isEdge;
+
+            BitmapData data = BitmapManip.lockBitmap(out buffer, p_image);
+            BitmapData edgeData = BitmapManip.lockBitmap(out edgeBuffer, p_edges);
+
+            //Create the points
+            m_topLeft = new Point((p_image.Width / 2) - 50, (p_image.Height / 2 - 50));
+            m_topRight = new Point((p_image.Width / 2) + 50, (p_image.Height / 2 - 50));
+            m_bottomLeft = new Point((p_image.Width / 2) - 50, (p_image.Height / 2 + 50));
+            m_bottomRight = new Point((p_image.Width / 2) + 50, (p_image.Height / 2 + 50));
+
+            int y, x;
+
+            #region Expand Up
+            isEdge = false;
+            for (y = m_topLeft.Y; isEdge == false && y > 3; --y)
+                for (x = m_topLeft.X; x < m_topRight.X && isEdge == false; ++x)
+                {
+                    byteOffset = ((y * p_image.Width) + x) * 4;
+
+                    //is an edge
+                    if (edgeBuffer[byteOffset] > 0)
+                        isEdge = true;
+                    else
+                    {
+                        m_validPixels.Add(Color.FromArgb(buffer[byteOffset + 2], buffer[byteOffset + 1],
+                                                         buffer[byteOffset]).ToArgb());
+                    }
+                }
+            #endregion
+
+            m_topLeft.Y = y - 1;
+            m_topRight.Y = y - 2; //because the left will be 1 pixel higher than the right
+
+            #region Expand Right
+            isEdge = false;
+            for (x = m_topRight.X; isEdge == false && x < p_image.Width - 3; ++x)
+                for (y = m_topRight.Y; y < m_bottomRight.Y && isEdge == false; ++y)
+                {
+                    byteOffset = ((y * p_image.Width) + x) * 4;
+
+                    //is an edge
+                    if (edgeBuffer[byteOffset] > 0)
+                        isEdge = true;
+                    else
+                    {
+                        m_validPixels.Add(Color.FromArgb(buffer[byteOffset + 2], buffer[byteOffset + 1],
+                                                         buffer[byteOffset]).ToArgb());
+                    }
+                }
+            #endregion
+
+            m_topRight.X = x - 1;
+            m_bottomRight.X = x - 2;
+
+            /* Expanding down is troublesome becuase of shadow edges */
+
+            #region Expand Left
+
+            isEdge = false;
+            for (x = m_topLeft.X; isEdge == false && x > 3; --x)
+            {
+                for (y = m_topLeft.Y; y < m_bottomLeft.Y && isEdge == false; ++y)
+                {
+                    byteOffset = ((y * p_image.Width) + x) * 4;
+
+                    //is an edge
+                    if (edgeBuffer[byteOffset] > 0)
+                        isEdge = true;
+                    else
+                    {
+                        m_validPixels.Add(Color.FromArgb(buffer[byteOffset + 2], buffer[byteOffset + 1],
+                                                         buffer[byteOffset]).ToArgb());
+                    }
+                }
+            }
+
+            #endregion
+
+            m_topLeft.X = x - 1;
+            m_bottomLeft.X = x - 2;
+
+            BitmapManip.unlockBitmap(ref edgeBuffer, ref edgeData, p_edges);
+            BitmapManip.unlockBitmap(ref buffer, ref data, p_image);
+        }
 
         /// <summary>
         /// This populates a filter to cancel out noise that isn't near the center
@@ -111,47 +240,77 @@ namespace MotionGestureProcessing
         {
             if (m_isInitialized)
             {
-                Image procImage = ((imageData)p_imageData).Image;
+
+
                 //Setting up a buffer to be used for concurrent read/write
                 byte[] buffer;
-                convert2PixelFormat(ref procImage);
-                BitmapData data = BitmapManip.lockBitmap(out buffer, procImage);
-                ImageProcess.convert2GreyScale(ref buffer);
+                BitmapData data = BitmapManip.lockBitmap(out buffer, ((imageData)p_imageData).Image);
+
+                //This method returns bit per pixel, we need bytes.
+                int depth = Bitmap.GetPixelFormatSize(data.PixelFormat) / 8; 
 
                 #region Call Parallel.Invoke for each coordinate
-                Parallel.Invoke(
-                    () =>
-                    {
-                        //upper left
-                        dividedDoWorkARGB(buffer, 0, 0, data.Width / 2, data.Height / 2, data.Width);
-                    },
-                    () =>
-                    {
-                        //upper right
-                        dividedDoWorkARGB(buffer, data.Width / 2, 0, data.Width, data.Height / 2, data.Width);
-                    },
-                    () =>
-                    {
-                        //lower left
-                        dividedDoWorkARGB(buffer, 0, data.Height / 2, data.Width / 2, data.Height, data.Width);
-                    },
-                    () =>
-                    {
-                        //lower right
-                        dividedDoWorkARGB(buffer, data.Width / 2, data.Height / 2, data.Width, data.Height, data.Width);
-                    });
+                //Only want to do ARGB and RGB check one time
+                // Creates more code but is faster
+                if (depth == 3)
+                    Parallel.Invoke(
+                        () =>
+                        {
+                            //upper left
+                            dividedDoWorkRGB(buffer, 0, 0, data.Width / 2, data.Height / 2, data.Width);
+                        },
+                        () =>
+                        {
+                            //upper right
+                            dividedDoWorkRGB(buffer, data.Width / 2, 0, data.Width, data.Height / 2, data.Width);
+                        },
+                        () =>
+                        {
+                            //lower left
+                            dividedDoWorkRGB(buffer, 0, data.Height / 2, data.Width / 2, data.Height, data.Width);
+                        },
+                        () =>
+                        {
+                            //lower right
+                            dividedDoWorkRGB(buffer, data.Width / 2, data.Height / 2, data.Width, data.Height, data.Width);
+                        });
+                else
+                    Parallel.Invoke(
+                        () =>
+                        {
+                            //upper left
+                            dividedDoWorkARGB(buffer, 0, 0, data.Width / 2, data.Height / 2, data.Width);
+                        },
+                        () =>
+                        {
+                            //upper right
+                            dividedDoWorkARGB(buffer, data.Width / 2, 0, data.Width, data.Height / 2, data.Width);
+                        },
+                        () =>
+                        {
+                            //lower left
+                            dividedDoWorkARGB(buffer, 0, data.Height / 2, data.Width / 2, data.Height, data.Width);
+                        },
+                        () =>
+                        {
+                            //lower right
+                            dividedDoWorkARGB(buffer, data.Width / 2, data.Height / 2, data.Width, data.Height, data.Width);
+                        });
                 #endregion
 
                 ((imageData)p_imageData).Datapoints = getDataPoints(ref data, ref buffer);
 
-                findHand((imageData)p_imageData, ref data, ref buffer);
+                findHand((imageData)p_imageData, data, buffer);
 
                 //Provide wide area filtering
-                //((imageData)p_imageData).Filter = m_filterArea;
+                ((imageData)p_imageData).Filter = m_filterArea;
                 //drawCenter(buffer, data, m_center);
 
                 //Guasian cancelling
-                //performCancellingARGB(ref buffer, data);
+                if (depth == 3)
+                    performCancellingRGB(ref buffer, data);
+                else
+                    performCancellingARGB(ref buffer, data);
 
                 ((imageData)p_imageData).Datapoints = getDataPoints(ref data, ref buffer);
 
@@ -160,10 +319,9 @@ namespace MotionGestureProcessing
                 strengthenSignal(ref data, ref buffer);
 
                 ((imageData)p_imageData).Datapoints = getDataPoints(ref data, ref buffer);
+                
+                BitmapManip.unlockBitmap(ref buffer, ref data, ((imageData)p_imageData).Image);
 
-                BitmapManip.unlockBitmap(ref buffer, ref data, procImage);
-
-                ((imageData)p_imageData).Image = procImage;
                 Processing.getInstance().ToPCAImage = (imageData)p_imageData;
 
                 //If someone is listener raise an event
@@ -179,11 +337,134 @@ namespace MotionGestureProcessing
         /// <param name="p_imageData">Image data</param>
         /// <param name="p_data">bitmap data</param>
         /// <param name="p_buffer">used for testing</param>
-        private void findHand(imageData p_imageData, ref BitmapData p_data, ref byte[] p_buffer)
+        private void findHand(imageData p_imageData, BitmapData p_data, byte[] p_buffer)
         {
             Point handCenter = m_center;
 
-   //         Dictionary<int, List<Point>> blobs = ImageProcess.findBlobs(ref p_data, ref p_buffer);
+            int[] xProjection = new int[p_data.Width];
+            int[] yProjection = new int[p_data.Height];
+            int[] xSmoothed = new int[p_data.Width];
+            int[] ySmoothed = new int[p_data.Height];
+
+            int xMax, yMax;
+            xMax = yMax = 0;
+
+            //Popluate histogram for x and y intesities
+            foreach (Point point in p_imageData.Datapoints)
+            {
+                ++xProjection[point.X];
+                ++yProjection[point.Y];
+                
+                //Because each point in the histogram is only increasing by one i can get away with this
+                if (xProjection[point.X] > xMax)
+                    ++xMax;
+                if (yProjection[point.Y] > yMax)
+                    ++yMax;
+            }
+
+            #region Smoothing
+            smoothing(ref xProjection, ref xSmoothed);
+            smoothing(ref yProjection, ref ySmoothed);
+            #endregion
+
+            #region find bounds around the previous center
+            // work from the center out.  This will help ignore outside noise.
+            //The bounds represent strong points in the histogram
+            int xLeftBound, xRightBound;
+            xLeftBound = xRightBound = handCenter.X;
+            int yTopBound, yBottomBound;
+            yTopBound = yBottomBound = handCenter.Y;
+            
+            Parallel.Invoke(
+                () =>
+                {
+                    findBound(ref yTopBound, ySmoothed, -1, m_filterArea.Width / 8, true); 
+                },
+                () =>
+                {
+                    findBound(ref yBottomBound, ySmoothed, 1, m_filterArea.Width / 8, true); 
+                },
+                () =>
+                {
+                    findBound(ref xLeftBound, xSmoothed, -1, m_filterArea.Height / 8, true); 
+                },
+                () =>
+                {
+                    findBound(ref xRightBound, xSmoothed, 1, m_filterArea.Height / 8, true); 
+                });
+            #endregion
+
+            #region Second pass
+            Point closest = new Point();
+
+            //Save the center from first pass as this will be the start of the second
+            closest.X = (xLeftBound + xRightBound) / 2;
+            closest.Y = (yTopBound + yBottomBound) / 2;
+
+            //Rectangles X and Y are based on the top right so adjustment is necesary
+            m_filterArea.X = closest.X - m_filterArea.Width / 2;
+            m_filterArea.Y = closest.Y - m_filterArea.Height / 2;
+
+            //Create a smaller window
+            xProjection = new int[m_filterArea.Width];
+            yProjection = new int[m_filterArea.Height];
+            xSmoothed = new int[m_filterArea.Width];
+            ySmoothed = new int[m_filterArea.Height];
+
+            List<Point> pointsInFilter = new List<Point>();
+
+            //Populate it with only data points that are within the rectangle
+            foreach (Point point in p_imageData.Datapoints)
+            {
+                if (m_filterArea.Contains(point))
+                {
+                    ++xProjection[point.X - m_filterArea.X];
+                    ++yProjection[point.Y - m_filterArea.Y];
+                    pointsInFilter.Add(point);
+                }
+            }
+
+            p_imageData.Datapoints = pointsInFilter;
+
+            //Smooth it out before the finding the center
+            smoothing(ref xProjection, ref xSmoothed);
+            smoothing(ref yProjection, ref ySmoothed);
+            #endregion
+
+            #region find bounds around the first center
+            //This second pass will work over a reduced area so I work from the outside
+            // of the rectangle in , not worrying about noise
+            xLeftBound = xRightBound = closest.X - m_filterArea.X;
+            yTopBound = xLeftBound = 1;
+            yBottomBound = m_filterArea.Height - 2;
+            xRightBound = m_filterArea.Width - 2;
+
+            Parallel.Invoke(
+                () =>
+                {
+                    findBound(ref yTopBound, ySmoothed, 1, m_filterArea.Width / 8, false);
+                },
+                () =>
+                {
+                    findBound(ref yBottomBound, ySmoothed, -1, m_filterArea.Width / 8, false);
+                },
+                () =>
+                {
+                    findBound(ref xLeftBound, xSmoothed, 1, m_filterArea.Height / 8, false);
+                },
+                () =>
+                {
+                    findBound(ref xRightBound, xSmoothed, -1, m_filterArea.Height / 8, false);
+                });
+            #endregion
+            closest.X = ((xLeftBound + xRightBound) / 2) + m_filterArea.X;
+            closest.Y = ((yTopBound + yBottomBound) / 2) + m_filterArea.Y;
+
+            //Update center and filter
+            m_center = new Point(closest.X, closest.Y);
+
+            m_filterArea.X = m_center.X - m_filterArea.Width / 2;
+            m_filterArea.Y = m_center.Y - m_filterArea.Height / 2;
         }
 
         /// <summary>
@@ -264,6 +545,7 @@ namespace MotionGestureProcessing
                         ranLastIteration = false;
                 }
 
+            int validPixels = DebugFunctions.DebugBuffer.getValidPixels(ref p_data, ref newBuffer);
             //copy the new buffer into the old
             Buffer.BlockCopy(newBuffer, 0, p_buffer, 0, p_buffer.Length);
         }
@@ -398,7 +680,44 @@ namespace MotionGestureProcessing
         }
 
         /// <summary>
+        /// Handles comparing pixels to the valid pixels for RGB or 24bpp
+        /// </summary>
+        /// <param name="p_buffer">Byte array of image to process</param>
+        /// <param name="startX">Start X position (0 = left)</param>
+        /// <param name="startY">Start Y position (0 = top)</param>
+        /// <param name="endX"></param>
+        /// <param name="endY"></param>
+        /// <param name="width">Width in pixels used to determine offset</param>
+        private void dividedDoWorkRGB(byte[] p_buffer, int startX, int startY, int endX, int endY, int width)
+        {
+            //To be overwritten 
+            int offset;
+            int curPixelColor;
+            
+            for (int y = startY; y < endY; ++y)
+                for (int x = startX; x < endX; ++x)
+                { 
+                    //Just a basic transform from 1 dimension to 2
+                    offset = ((y * width) + x) * 3;
+                    
+                    //FromArgb requires rgb but array is ordered bgr
+                    curPixelColor = Color.FromArgb(p_buffer[offset + 2], p_buffer[offset + 1], p_buffer[offset]).ToArgb();
+                    if (!m_validPixels.Contains(curPixelColor))
+                    {
+                        p_buffer[offset + 0] = p_buffer[offset + 1] = 
+                        p_buffer[offset + 2] = 0; //black is all zeroes
+                    }
+                    else
+                    {
+                        //white is all 1
+                        //p_buffer[offset] = p_buffer[offset + 1] = p_buffer[offset + 2] = 255;
+                    }
+                }
+        }
+
+        /// <summary>
         /// Handles comparing pixels to the valid pixels for ARGB or 32bpp
+        /// This is an exact copy of dividedDoWorkRGB except the get and replace functions include space for ARGB format
         /// </summary>
         /// <param name="p_buffer">Byte array of image to process</param>
         /// <param name="startX">Start X position (0 = left)</param>
@@ -408,19 +727,30 @@ namespace MotionGestureProcessing
         /// <param name="width">Width in pixels used to determine offset</param>
         private void dividedDoWorkARGB(byte[] p_buffer, int startX, int startY, int endX, int endY, int width)
         {
+            //Read above comments.
+            Color BLACK = Color.Black;
+
             int offset;
             int curPixelColor;
             
             for (int y = startY; y < endY; ++y)
                 for (int x = startX; x < endX; ++x)
                 {
-                    offset = ImageProcess.getOffset(x, y, width, 4);
-
-                    if ((m_backGround[offset] > p_buffer[offset] ? m_backGround[offset] - p_buffer[offset] :
-                                                                   p_buffer[offset] - m_backGround[offset]) > m_threshold)
-                        p_buffer[offset] = p_buffer[offset + 1] = p_buffer[offset + 2] = 255;
+                    offset = ((y * width) + x) * 4;
+                    curPixelColor = Color.FromArgb(p_buffer[offset + 3], p_buffer[offset + 2], 
+                                                   p_buffer[offset + 1], p_buffer[offset]).ToArgb();
+                    if (!m_validPixels.Contains(curPixelColor))
+                    {
+                        p_buffer[offset + 0] = p_buffer[offset + 1] = 
+                        p_buffer[offset + 2] = 0;
+                        p_buffer[offset + 3] = 255;
+                    }
                     else
-                        p_buffer[offset] = p_buffer[offset + 1] = p_buffer[offset + 2] = 0;
+                    {
+                        //white is all 1
+                        //p_buffer[offset] = p_buffer[offset + 1] = 
+                        //p_buffer[offset + 2] = p_buffer[offset + 3] = 255;
+                    }
                 }
         }
 

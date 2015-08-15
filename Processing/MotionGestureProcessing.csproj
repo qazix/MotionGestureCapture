@@ -41,6 +41,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Gesture.cs" />
+    <Compile Include="HandIsolationOld.cs" />
     <Compile Include="HandIsolation.cs" />
     <Compile Include="imageData.cs" />
     <Compile Include="PCA.cs" />

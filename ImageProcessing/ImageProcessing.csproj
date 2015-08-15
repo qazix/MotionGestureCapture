@@ -41,6 +41,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="BitmapManip.cs" />
+    <Compile Include="ComponentLabel.cs" />
     <Compile Include="ConvexHullObj.cs" />
     <Compile Include="ImageProcess.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

@@ -813,6 +813,7 @@ namespace ImageProcessing
         static public Dictionary<int, List<Point>> findBlobs(ref BitmapData p_data, ref byte[] p_buffer)
         {
             Dictionary<int, List<Point>> blobs = new Dictionary<int,List<Point>>();
+            Dictionary<int, int> labelMap = new Dictionary<int, int>();
             //Create and populate a binary map
             int[,] binMap = new int[p_data.Height, p_data.Width];
 
@@ -834,9 +835,10 @@ namespace ImageProcessing
                     if (binMap[y, x] == 1)
                     {
                         for (int i = 0; i < 4; ++i)
-                            searchSpace.Add(binMap[i / 3, i % 3]);
+                            searchSpace.Add(binMap[y + (i / 3) - 1, x + (i % 3) - 1]);
 
-                        searchSpace.Remove(0);
+                        searchSpace.Remove(0); //remove background pixels
+                        searchSpace.Remove(1); //remove first row and last column foreground pixels
                         switch (searchSpace.Count)
                         {
                             case 0:
@@ -848,16 +850,14 @@ namespace ImageProcessing
                                     curLabel = ComponentLabel.getInstance(searchSpace.First());
                                 break;
 
+                            case 4:
+                            case 3:
                             case 2: //This is gaurenteed to be two different values from left and top right
-                                min = searchSpace.Min();
-                                if (curLabel.Id != min)
-                                    curLabel = ComponentLabel.getInstance(min);
-
-                                ComponentLabel.getInstance(searchSpace.Max()).Parent = curLabel;
+                                 curLabel = ComponentLabel.Union(searchSpace.ToArray());
                                 break;
 
                             default:
-                                throw new Exception("3 distinct values in blob detection");
+                                throw new Exception("4 distinct values in blob detection");
                         }
 
                         searchSpace.Clear();
@@ -866,23 +866,38 @@ namespace ImageProcessing
                 }
             #endregion
             #region Second Pass
-            for (int y = 1; y < p_data.Height; ++y)
-                for (int x = 1; x < p_data.Width - 1; ++x)
-                {
-                    if (binMap[y, x] != 0)
+            if (curLabel != null)
+            {
+                int root, label;
+                label = curLabel.Id;
+                root = ComponentLabel.Find(label).Id;
+
+                for (int y = 1; y < p_data.Height; ++y)
+                    for (int x = 1; x < p_data.Width - 1; ++x)
                     {
-                        if (binMap[y, x] != curLabel.Id)
-                            curLabel = ComponentLabel.getInstance(binMap[y, x]);
+                        if (binMap[y, x] != 0)
+                        {
+                            //Store the labels and roots into a map for constant lookup
+                            if (binMap[y, x] != label)
+                            {
+                                label = binMap[y, x];
 
-                        if (!blobs.ContainsKey(curLabel.Id))
-                            blobs[curLabel.EldestId] = new List<Point>();
+                                if (!labelMap.ContainsKey(label))
+                                    labelMap[label] = ComponentLabel.Find(label).Id;
 
-                        blobs[curLabel.EldestId].Add(new Point(x, y));
+                                root = labelMap[label];
+                            }
+                            //if the blob for this root doesn't exist create it
+                            if (!blobs.ContainsKey(root))
+                                blobs[root] = new List<Point>();
+
+                            blobs[root].Add(new Point(x, y));
+                        }
                     }
-                }
+            }
             #endregion
 
-            
+            ComponentLabel.dispose();
 
             return blobs;
         }

@@ -144,7 +144,12 @@ namespace MotionGestureProcessing
 
                 ((imageData)p_imageData).Datapoints = getDataPoints(ref data, ref buffer);
 
-                findHand((imageData)p_imageData, ref data, ref buffer);
+                //Provide finer area filtering and signal enhancing
+                filterNoise(((imageData)p_imageData).Datapoints, ref data, ref buffer);
+                strengthenSignal(ref data, ref buffer);
+
+                ((imageData)p_imageData).Datapoints = findHand(ref data, ref buffer);
+                updateBuffer(((imageData)p_imageData).Datapoints, ref data, ref buffer);
 
                 //Provide wide area filtering
                 //((imageData)p_imageData).Filter = m_filterArea;
@@ -153,13 +158,7 @@ namespace MotionGestureProcessing
                 //Guasian cancelling
                 //performCancellingARGB(ref buffer, data);
 
-                ((imageData)p_imageData).Datapoints = getDataPoints(ref data, ref buffer);
-
-                //Provide finer area filtering and signal enhancing
-                filterNoise(((imageData)p_imageData).Datapoints, ref data, ref buffer);
-                strengthenSignal(ref data, ref buffer);
-
-                ((imageData)p_imageData).Datapoints = getDataPoints(ref data, ref buffer);
+                //((imageData)p_imageData).Datapoints = getDataPoints(ref data, ref buffer);
 
                 BitmapManip.unlockBitmap(ref buffer, ref data, procImage);
 
@@ -179,11 +178,15 @@ namespace MotionGestureProcessing
         /// <param name="p_imageData">Image data</param>
         /// <param name="p_data">bitmap data</param>
         /// <param name="p_buffer">used for testing</param>
-        private void findHand(imageData p_imageData, ref BitmapData p_data, ref byte[] p_buffer)
+        private List<Point> findHand(ref BitmapData p_data, ref byte[] p_buffer)
         {
-            Point handCenter = m_center;
 
-   //         Dictionary<int, List<Point>> blobs = ImageProcess.findBlobs(ref p_data, ref p_buffer);
+            Dictionary<int, List<Point>> blobs = ImageProcess.findBlobs(ref p_data, ref p_buffer);
+
+            if (blobs.Count > 0)
+                return blobs.Aggregate((l, r) => l.Value.Count > r.Value.Count ? l : r).Value;
+            else
+                return new List<Point>();        
         }
 
         /// <summary>
@@ -338,6 +341,23 @@ namespace MotionGestureProcessing
             }
 
             return dataPoints;
+        }
+
+        private void updateBuffer(List<Point> p_dataPoints, ref BitmapData p_data, ref byte[] p_buffer)
+        {
+            byte[] newBuffer = new byte[p_buffer.Length];
+            int offset;
+
+            foreach (Point point in p_dataPoints)
+            {
+                offset = ImageProcess.getOffset(point.X, point.Y, p_data.Width, 4);
+                newBuffer[offset] = newBuffer[offset + 1] = newBuffer[offset + 2] = 255;
+            }
+
+            for (offset = 3; offset < p_buffer.Length; offset += 4)
+                newBuffer[offset] = 255;
+
+            Buffer.BlockCopy(newBuffer, 0, p_buffer, 0, p_buffer.Length);
         }
 
         /// <summary>

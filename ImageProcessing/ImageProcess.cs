@@ -12,527 +12,203 @@ namespace ImageProcessing
 {
     public class ImageProcess
     {
-        #region Edge Detection
-        //Sobel filters
-        private static int[,] m_xFilter = {{-1, 0, 1},
-                                           {-2, 0, 2},
-                                           {-1, 0, 1}};
-
-        private static int[,] m_yFilter = {{-1, -2, -1},
-                                           { 0,  0,  0},
-                                           { 1,  2,  1}};
-
+        #region Blob Extraction
         /// <summary>
-        /// use the Canny edge detection algorithm
+        /// This uses the two pass method to search for blobs
         /// </summary>
-        /// <seealso cref="http://www.codeproject.com/Articles/93642/Canny-Edge-Detection-in-C"/>
-        /// <see cref="http://softwarebydefault.com/2013/05/11/image-edge-detection/"/>
-        /// <param name="p_image">Image to find edges on</param>
-        /// <returns>Bitmap with edges</returns>
-        public static Image findEdges(Image p_image)
+        /// <seealso cref="https://en.wikipedia.org/wiki/Connected-component_labeling"/>
+        /// <param name="p_data"></param>
+        /// <param name="p_buffer"></param>
+        /// <returns>All blobs found from search</returns>
+        static public Dictionary<int, List<Point>> findBlobs(ref BitmapData p_data, ref byte[] p_buffer)
         {
-            //step 0
-            //Convert an image to an byte array
-            Image edgeImage = new Bitmap(p_image);
-            byte[] resultBuffer = new byte[edgeImage.Width * edgeImage.Height];
-            byte[] pixelBuffer;
-            BitmapData data = BitmapManip.lockBitmap(out pixelBuffer, edgeImage);
-            convert2GreyScale(ref pixelBuffer);
+            Dictionary<int, List<Point>> blobs = new Dictionary<int, List<Point>>();
+            Dictionary<int, int> labelMap = new Dictionary<int, int>();
+            //Create and populate a binary map
+            int[,] binMap = new int[p_data.Height, p_data.Width];
 
-            //step 1 blur image
-            blurImage(ref pixelBuffer, edgeImage.Width, ref resultBuffer);
+            for (int i = 0; i < p_buffer.Length; i += 4)
+                if (p_buffer[i] != 0)
+                    binMap[i / p_data.Stride, (i % p_data.Stride) / 4] = 1;
 
-            //TODO: comment this out and replace with this (pixelBuffer = resultBuffer;)
-            //Check the images as I go strictly for testing
-            BitmapManip.unlockBitmap(ref resultBuffer, ref data, edgeImage);
-            //edgeImage.Save("SmoothedImage.bmp");
-            data = BitmapManip.lockBitmap(out pixelBuffer, edgeImage);
+            //curLabel is not instantiated here because the first pixel will never have a point to the left or above it.
+            //  Therefore it will be instantiated before I use it.
+            ComponentLabel curLabel = null;
 
-            //step 2 apply sobel filters to find gradients
-            float[,] angleMap = new float[edgeImage.Height, edgeImage.Width];
-            findGradients(ref pixelBuffer, edgeImage.Width, ref resultBuffer, ref angleMap);
-
-            //TODO: comment this out and replace with this (pixelBuffer = resultBuffer;)
-            BitmapManip.unlockBitmap(ref resultBuffer, ref data, edgeImage);
-            //edgeImage.Save("FilteredImage.bmp");
-            data = BitmapManip.lockBitmap(out pixelBuffer, edgeImage);
-
-            //step 3 clear out all non local maximum values
-            nonMaxSuppression(ref pixelBuffer, edgeImage.Width, ref resultBuffer, angleMap);
-
-            //TODO: comment this out and replace with this (pixelBuffer = resultBuffer;)
-            BitmapManip.unlockBitmap(ref resultBuffer, ref data, edgeImage);
-            //scan0edgeImage.Save("NonMaxSupressImage.bmp");
-            data = BitmapManip.lockBitmap(out pixelBuffer, edgeImage);
-
-            //Step 4 dual edge thresholding
-            thresholding(ref pixelBuffer, edgeImage.Width, ref resultBuffer);
-
-            //thresholding doens't give a human recognizable output
-            BitmapManip.unlockBitmap(ref resultBuffer, ref data, edgeImage);
-            data = BitmapManip.lockBitmap(out pixelBuffer, edgeImage);
-
-            //Step 5 HysteresisThresholding
-            hysterisisThresholding(ref pixelBuffer, edgeImage.Width, ref resultBuffer);
-
-            //Restore byte array to image
-            BitmapManip.unlockBitmap(ref resultBuffer, ref data, edgeImage);
-            edgeImage.Save("Thresholding.bmp");
-
-            return edgeImage;
-        }
-
-
-
-        /// <summary>
-        /// The first step of Canny edge detection
-        /// Filter the image we do this by applying a gausian filter over the image
-        /// </summary>
-        /// <param name="p_image">byte array of the image to blur</param>
-        /// <param name="p_width">width in pixels of the image</param>
-        /// <param name="p_resultImage"></param>
-        private static void blurImage (ref byte[] p_image, int p_width, ref byte[] p_resultImage)
-        {
-            //setup gaussian kernel stuff
-            int[,] gausianKernel;
-            int kernalSize = 5;
-            int sigma = 1;
-
-            //Populate gaussian filter
-            int weight = generateGausianKernel(kernalSize, sigma, out gausianKernel);
-
-            //perform filtering
-            int limit = kernalSize / 2;
-            double red, green, blue;
-            int byteOffset, filterOffset;
-            p_resultImage = p_image;
-
-            int height = p_image.Length / (p_width * 4);
-
-            for (int y = limit; y < height - limit; ++y)
-                for (int x = limit; x < p_width - limit; ++x)
+            #region First Pass
+            HashSet<int> searchSpace = new HashSet<int>();
+            int min;
+            //iterate through binmap and find foreground pixels
+            for (int y = 1; y < p_data.Height; ++y)
+                for (int x = 1; x < p_data.Width - 1; ++x)
                 {
-                    //red = 0;
-                    //green = 0;
-                    blue = 0;
-                    byteOffset = ((y * p_width) + x) * 4;
+                    if (binMap[y, x] == 1)
+                    {
+                        for (int i = 0; i < 4; ++i)
+                            searchSpace.Add(binMap[y + (i / 3) - 1, x + (i % 3) - 1]);
 
-                    for (int filterY = -limit; filterY <= limit; ++filterY)
-                        for (int filterX = -limit; filterX <= limit; ++filterX)
+                        searchSpace.Remove(0); //remove background pixels
+                        searchSpace.Remove(1); //remove first row and last column foreground pixels
+                        switch (searchSpace.Count)
                         {
-                            //sum all the values in the gausian filter
-                            filterOffset = byteOffset + ((filterY * p_width) + filterX) * 4;
-                            blue += (double)p_image[filterOffset] *
-                                        gausianKernel[limit + filterY, limit + filterX];
-                            //green += (double)(p_image[filterOffset + 1]) *
-                            //            gausianKernel[limit + filterY, limit + filterX];
-                            //red += (double)(p_image[filterOffset + 2]) *
-                            //            gausianKernel[limit + filterY, limit + filterX];
+                            case 0:
+                                curLabel = ComponentLabel.getInstance();
+                                break;
+
+                            case 1:
+                                if (curLabel.Id != searchSpace.First())
+                                    curLabel = ComponentLabel.getInstance(searchSpace.First());
+                                break;
+
+                            case 4:
+                            case 3:
+                            case 2: //This is gaurenteed to be two different values from left and top right
+                                curLabel = ComponentLabel.Union(searchSpace.ToArray());
+                                break;
+
+                            default:
+                                throw new Exception("4 distinct values in blob detection");
                         }
-                    //Average them so they are within the byte range
-                    blue /= weight;
-                    //green /= weight;
-                    //red /= weight;
 
-                    //Put them into the result image
-                    p_resultImage[byteOffset] = p_resultImage[byteOffset + 1] =
-                        p_resultImage[byteOffset + 2] = (byte)blue;
-
-                    //p_resultImage[byteOffset + 1] = (byte)green;
-                    //p_resultImage[byteOffset + 2] = (byte)red;
-                    p_resultImage[byteOffset + 3] = 255;
+                        searchSpace.Clear();
+                        binMap[y, x] = curLabel.Id;
+                    }
                 }
-        }
+            #endregion
+            #region Second Pass
+            if (curLabel != null)
+            {
+                int root, label;
+                label = curLabel.Id;
+                root = ComponentLabel.Find(label).Id;
 
+                for (int y = 1; y < p_data.Height; ++y)
+                    for (int x = 1; x < p_data.Width - 1; ++x)
+                    {
+                        if (binMap[y, x] != 0)
+                        {
+                            //Store the labels and roots into a map for constant lookup
+                            if (binMap[y, x] != label)
+                            {
+                                label = binMap[y, x];
+
+                                if (!labelMap.ContainsKey(label))
+                                    labelMap[label] = ComponentLabel.Find(label).Id;
+
+                                root = labelMap[label];
+                            }
+                            //if the blob for this root doesn't exist create it
+                            if (!blobs.ContainsKey(root))
+                                blobs[root] = new List<Point>();
+
+                            blobs[root].Add(new Point(x, y));
+                        }
+                    }
+            }
+            #endregion
+
+            ComponentLabel.dispose();
+
+            return blobs;
+        }
+        #endregion
+
+        #region Contour Tracing
         /// <summary>
-        /// The kernel for the filter to be run over the data
+        /// Trace the edge of a forground blob, uses Theo Palvidis' algorithm
         /// </summary>
-        /// <param name="p_sizeOfKernel"></param>
-        /// <param name="p_sigma"></param>
-        /// <param name="p_gKernel"></param>
+        /// <seealso cref="http://www.imageprocessingplace.com/downloads_V3/root_downloads/tutorials/contour_tracing_Abeer_George_Ghuneim/theo.html"/>
+        /// <param name="p_data"></param>
+        /// <param name="p_buffer"></param>
         /// <returns></returns>
-        private static int generateGausianKernel(int p_sizeOfKernel, float p_sigma, out int[,] p_gKernel)
+        public static List<Point> getContour(ref BitmapData p_data, ref byte[] p_buffer)
         {
-            double pi = (double)Math.PI;
+            int offset;
 
-            //kernel is temporary to find precise 
-            double[,] kernel = new double[p_sizeOfKernel, p_sizeOfKernel];
-            p_gKernel = new int[p_sizeOfKernel, p_sizeOfKernel];
+            //Find starting point
+            for (offset = 0; offset < p_buffer.Length && p_buffer[offset] == 0; offset += 4)
+                ;
+            
+            Point p = getPoint(offset, p_data.Width, 4);
+            ContourTracer ct = new ContourTracer(ref p_buffer, p, p_data.Width, ContourTracer.Direction.RIGHT);
 
-            double D2 = p_sigma * p_sigma * 2;
-            double D1 = 1 / (pi * D2);
+            return ct.trace();
+        }
 
-            int sum, mult;
-            double min = 1000; //initialize min to something large
-            int upper = p_sizeOfKernel / 2;
-            int lower = -upper;
 
-            //Find min value
-            for (int i = lower; i <= upper; ++i)
-                for (int j = lower; j <= upper; ++j)
-                {
-                    kernel[upper + i, upper + j] = ((1 / D1) * (double)Math.Exp(
-                                                          -(i * i + j * j) / D2));
-                    if (kernel[upper + i, upper + j] < min)
-                        min = kernel[upper + i, upper + j];
-                }
+        #endregion
 
-            mult = (int)(1 / min);
-            sum = 0;
+        #region Convex Defects
+        private static int M_REDUCTION = 4;
 
-            //Calculate sum adjusting if the min was between 0 and 1
-            if (min > 0 && min < 1)
+        /// <summary>
+        /// Using snakes from each line of the hull towards the center to find
+        ///  the convex defects 
+        /// </summary>
+        /// <param name="p_convexHull">The hull around the datapoints</param>
+        /// <param name="p_interiorPoints"></param>
+        /// <param name="p_size"></param>
+        /// <returns></returns>
+        public static List<Point> getConvexDefects(List<Point> p_convexHull, List<Point> p_interiorPoints,
+                                                   Size p_size)
+        {
+            /*
+            //Create a task list
+            Task<SnakeResults>[] tasks = new Task<SnakeResults>[p_convexHull.Count];
+
+            //Populate the snake navigation map
+            byte[,] snakeMap = new byte[p_size.Height / M_REDUCTION, p_size.Width / M_REDUCTION];
+            populateSnakeMap(ref snakeMap, p_interiorPoints);
+
+            Point[] reducedConvexHull = p_convexHull.ToArray();
+
+            for (int i = 0; i < p_convexHull.Count; ++i)
             {
-                for (int i = lower; i <= upper; ++i)
-                    for (int j = lower; j <= upper; ++j)
-                    {
-                        p_gKernel[upper + i, upper + j] = (int)Math.Round(
-                            kernel[upper + i, upper + j] * mult, 0);
-                        sum += p_gKernel[upper + i, upper + j];
-                    }
-            }
-            else
-            {
-                for(int i = lower; i <= upper; ++i)
-                    for (int j = lower; j <= upper; ++j)
-                    {
-                        p_gKernel[upper + i, upper + j] = (int)Math.Round(
-                            kernel[upper + i, upper + j], 0);
-                        sum += p_gKernel[upper + i, upper + j];
-                    }
+                Point start = new Point(reducedConvexHull[i].X /= M_REDUCTION,
+                                  reducedConvexHull[i].Y /= M_REDUCTION);
+                Point end = new Point(reducedConvexHull[(i + 1) % p_convexHull.Count].X /= M_REDUCTION,
+                                reducedConvexHull[(i + 1) % p_convexHull.Count].Y /= M_REDUCTION);
+
+                //Start a task for each line in the hull to find 
+                tasks[i] = Task.Factory.StartNew(() => runSnakes(start, end, snakeMap));
             }
 
-            return sum;
+            //Wait for the tasks to finish
+            Task.WaitAll(tasks); 
+
+            //return a list of the points returned
+            return organizePoints(tasks.Select(x => x.Result).ToList());
+             * */
+            return new List<Point>();
         }
 
         /// <summary>
-        /// Apply Sobel filtering to the smoothed image
+        /// Populates the navigation map for the snakes.
         /// </summary>
-        /// <param name="p_image">Byte array of Smoothed image</param>
-        /// <param name="p_width">width in pixels</param>
-        /// <param name="p_resultImage">Byte array to write the results to</param>
-        private static void findGradients(ref byte[] p_image, int p_width, ref byte[] p_resultImage, ref float[,] p_angleMap)
+        /// <param name="p_snakeMap">The map to be populated</param>
+        /// <param name="p_interiorPoints">Points to reduce into snake map</param>
+        private static void populateSnakeMap(ref byte[,] p_snakeMap, List<Point> p_interiorPoints)
         {
-            //variables needed for this funciton
-            int limit = m_xFilter.GetLength(0) / 2;
-            double blueX, greenX, redX;
-            double blueY, greenY, redY;
-            double blueTot, greenTot, redTot;
-            int byteOffset, filterOffset, xFilterVal, yFilterVal;
-            float pi = (float)Math.PI;
-
-            int height = p_image.Length / (p_width * 4);
-
-            //Iterate through pixels
-            for (int y = limit; y < height - limit; ++y)
-                for (int x = limit; x < p_width - limit; ++x)
-                {
-                    blueX = greenX = redX = 0.0;
-                    blueY = greenY = redY = 0.0;
-                    blueTot = greenTot = redTot = 0.0;
-
-                    byteOffset = ((y * p_width) + x) * 4;
-
-                    //Apply sobel filters
-                    for (int filterY = -limit; filterY <= limit; ++filterY)
-                        for (int filterX = -limit; filterX <= limit; ++filterX)
-                        {
-                            filterOffset = byteOffset + ((filterY * p_width) + filterX) * 4;
-                            xFilterVal = m_xFilter[limit + filterY, limit + filterX];
-                            yFilterVal = m_yFilter[limit + filterY, limit + filterX];
-
-                            blueX  += (double)p_image[filterOffset] * xFilterVal;
-                            //greenX += (double)p_image[filterOffset + 1] * xFilterVal;
-                            //redX   += (double)p_image[filterOffset + 2] * xFilterVal;
-
-                            blueY  += (double)p_image[filterOffset] * yFilterVal;
-                            //greenY += (double)p_image[filterOffset + 1] * yFilterVal;
-                            //redX   += (double)p_image[filterOffset + 2] * yFilterVal;
-                        }
-
-                    //Take the cartesian product of colors
-                    blueTot = Math.Sqrt((blueX * blueX) +
-                                        (blueY * blueY));
-                    //greenTot = Math.Sqrt((greenX * greenX) +
-                    //                     (greenY * greenY));
-                    //redTot = Math.Sqrt((redX * redX) +
-                    //                   (redY * redY));
-
-                    p_resultImage[byteOffset] = p_resultImage[byteOffset + 1] = 
-                        p_resultImage[byteOffset + 2] = (byte)blueTot;
-                    //p_resultImage[byteOffset + 1] = (byte)greenTot;
-                    //p_resultImage[byteOffset + 2] = (byte)redTot;
-                    p_resultImage[byteOffset + 3] = 255;
-
-                    if (blueX == 0)
-                        p_angleMap[y, x] = 90f;
-                    else
-                        p_angleMap[y, x] = (float)Math.Abs(Math.Atan(blueY / blueX) * 180 / pi);
-                }
-        }
-       
-        /// <summary>
-        /// This removes the pixels that arent edges
-        /// </summary>
-        /// <param name="p_image">Gradient Image byte array</param>
-        /// <param name="p_width">width in pixels of image</param>
-        /// <param name="p_resultBuffer">byte array to store results</param>
-        /// <param name="p_angleMap">tangents of the angles, used in Canny edge deteciton</param>
-        private static void nonMaxSuppression(ref byte[] p_image, int p_width, ref byte[] p_resultBuffer, float[,] p_angleMap)
-        {
-            int limit = m_xFilter.GetLength(0) / 2; //Because my sobel filter is 3 wide
-            int height = p_image.Length / (p_width * 4);
-            int byteOffset, posTanOffset, negTanOffset;
-
-            for (int y = limit; y < height - limit; ++y)
-                for (int x = limit; x < p_width - limit; ++x)
-                {
-                    byteOffset = ((y * p_width) + x) * 4;
-
-                    //Horizantal edge
-                    if (p_angleMap[y, x] <= 22.5 || p_angleMap[y, x] > 157.5)
-                    {
-                        posTanOffset = byteOffset + 4;
-                        negTanOffset = byteOffset - 4;
-                        if (p_image[byteOffset] < p_image[posTanOffset] || 
-                            p_image[byteOffset] < p_image[negTanOffset])
-                        {
-                            p_resultBuffer[byteOffset] = 
-                                p_resultBuffer[byteOffset + 1] =
-                                p_resultBuffer[byteOffset + 2] = 0;
-                            p_resultBuffer[byteOffset + 3] = 255;
-                        }
-                    }
-                    //+45 degree edge
-                    else if (p_angleMap[y, x] <= 67.5)
-                    {
-                        posTanOffset = byteOffset + (p_width - 1) * 4;
-                        negTanOffset = byteOffset - (p_width - 1) * 4;
-                        if (p_image[byteOffset] < p_image[posTanOffset] ||
-                            p_image[byteOffset] < p_image[negTanOffset])
-                        {
-                            p_resultBuffer[byteOffset] = 
-                                p_resultBuffer[byteOffset + 1] =
-                                p_resultBuffer[byteOffset + 2] = 0;
-                            p_resultBuffer[byteOffset + 3] = 255;
-                        }
-                    }
-                    //Vertical edge
-                    else if (p_angleMap[y, x] <= 112.5)
-                    {
-                        posTanOffset = byteOffset + p_width * 4;
-                        negTanOffset = byteOffset - p_width * 4;
-                        if (p_image[byteOffset] < p_image[posTanOffset] ||
-                            p_image[byteOffset] < p_image[negTanOffset])
-                        {
-                            p_resultBuffer[byteOffset] = 
-                                p_resultBuffer[byteOffset + 1] =
-                                p_resultBuffer[byteOffset + 2] = 0;
-                            p_resultBuffer[byteOffset + 3] = 255;
-                        }
-                    }
-                    //-45 degree edge
-                    else
-                    {
-                        posTanOffset = byteOffset + (p_width + 1) * 4;
-                        negTanOffset = byteOffset - (p_width + 1) * 4;
-                        if (p_image[byteOffset] < p_image[posTanOffset] ||
-                            p_image[byteOffset] < p_image[negTanOffset])
-                        {
-                            p_resultBuffer[byteOffset] = 
-                                p_resultBuffer[byteOffset + 1] =
-                                p_resultBuffer[byteOffset + 2] = 0;
-                            p_resultBuffer[byteOffset + 3] = 255;
-                        }
-                    }
-                }
+            //put all the points into an array, reducing the size for speed and accuracy
+            foreach (Point point in p_interiorPoints)
+                p_snakeMap[point.Y / M_REDUCTION, point.X / M_REDUCTION] = 1;
         }
 
         /// <summary>
-        /// This is a rather simple process of only populating the result buffer with values that exceed 
-        /// 
+        /// Gradually moves points of the snake into the defect areas of the hull
         /// </summary>
-        /// <param name="p_image"></param>
-        /// <param name="p_width"></param>
-        /// <param name="p_resultBuffer"></param>
-        private static void thresholding(ref byte[] p_image, int p_width, ref byte[] p_resultBuffer)
+        /// <param name="p_point1">Starting point</param>
+        /// <param name="p_point2">Ending point</param>
+        /// <returns></returns>
+        private static SnakeResults runSnakes(Point p_point1, Point p_point2, byte[,] p_snakeMap)
         {
-            int limit = m_xFilter.GetLength(0) / 2;
-            int height = p_image.Length / (p_width * 4);
-            int byteOffset;
-
-            //Determine the thresholds
-            float maxThreshold = otsuThreshold(p_image) * 0.4f;  //Otsu's algorithm cut out too much
-            float minThreshold = 0.5f * maxThreshold;
-
-            //Dual thresholding
-            for (int y = limit; y < height - limit; ++y)
-                for (int x = limit; x < p_width - limit; ++x)
-                {
-                    byteOffset = ((y * p_width) + x) * 4;
-                    
-                    //set flags for strong and weak edges, 1 and 2 repectively
-                    if (p_image[byteOffset] >= maxThreshold)
-                        p_resultBuffer[byteOffset] = 1;
-
-                    else if (p_image[byteOffset] >= minThreshold)
-                        p_resultBuffer[byteOffset] = 2;
-
-                    else
-                        p_resultBuffer[byteOffset] = 0;
-                }
+            Snake snake = new Snake(p_point1, p_point2, p_snakeMap);
+            return snake.getResults();
         }
 
-        
-
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="p_image"></param>
-        /// <param name="p_width"></param>
-        /// <param name="p_resultBuffer"></param>
-        private static void hysterisisThresholding(ref byte[] p_image, int p_width, ref byte[] p_resultBuffer)
+        private static List<Point> organizePoints(List<SnakeResults> list)
         {
-            int limit = m_xFilter.GetLength(0) / 2;
-            int height = p_image.Length / (p_width * 4);
-            int byteOffset;
-
-            int[,] edgeMap = new int[height, p_width];
-            int[,] resultMap = new int[height, p_width];
-            int[,] visitedMap = new int[height, p_width];
-
-            //populate edgemap
-            for (int y = limit; y < height - limit; ++y)
-                for (int x = limit; x < p_width - limit; ++x)
-                {
-                    byteOffset = ((y * p_width) + x) * 4;
-
-                    if (p_image[byteOffset] == 1)
-                        edgeMap[y, x] = 1;
-                    else if (p_image[byteOffset] == 2)
-                        edgeMap[y, x] = 2;
-                }
-
-            resultMap = edgeMap;
-
-            //Perform traversal process
-            for (int y = limit; y < height - limit; ++y)
-                for (int x = limit; x < p_width - limit; ++x)
-                {
-                    byteOffset = ((y * p_width) + x) * 4;
-
-                    if (p_image[byteOffset] == 1)
-                    {
-                        traverse(x, y, ref visitedMap, ref edgeMap, ref resultMap);
-                        visitedMap[y, x] = 1;
-                    }
-                }
-
-            //Write results to resultbuffer
-            for (int y = limit; y < height - limit; ++y)
-                for (int x = limit; x < p_width - limit; ++x)
-                {
-                    byteOffset = ((y * p_width) + x) * 4;
-                    
-                    if (resultMap[y, x] == 1)
-                    {
-                        p_resultBuffer[byteOffset] = p_resultBuffer[byteOffset + 1] =
-                            p_resultBuffer[byteOffset + 2] = 255;
-                    }
-                    else
-                    {
-                        p_resultBuffer[byteOffset] = p_resultBuffer[byteOffset + 1] =
-                            p_resultBuffer[byteOffset + 2] = 0;
-                    }
-
-                    p_resultBuffer[byteOffset + 3] = 255;
-                }
-        }
-
-        /// <summary>
-        /// A recursive walking algorithm to ensure all weak edges are attached
-        ///  to strong edges
-        /// </summary>
-        /// <param name="X">X position</param>
-        /// <param name="Y">Y position</param>
-        /// <param name="visitedMap">Map to determine if the traversal has visited this square</param>
-        /// <param name="p_width">width of image in pixels</param>
-        private static void traverse(int X, int Y, ref int[,] visitedMap, ref int[,] edgeMap, ref int[,] resultMap)
-        {
-            if (visitedMap[Y, X] == 1)
-                return;
-
-            //1
-            if (edgeMap[Y + 1, X] == 2)
-            {
-                resultMap[Y + 1, X] = 1;
-                visitedMap[Y + 1, X] = 1;
-                traverse(X, Y + 1, ref visitedMap, ref edgeMap, ref resultMap);
-                return;
-            }
-
-            //2
-            if (edgeMap[Y + 1, X - 1] == 2)
-            {
-                resultMap[Y + 1, X - 1] = 1;
-                visitedMap[Y + 1, X - 1] = 1;
-                traverse(X - 1, Y + 1, ref visitedMap, ref edgeMap, ref resultMap);
-                return;
-            }
-
-            //3
-            if (edgeMap[Y, X - 1] == 2)
-            {
-                resultMap[Y, X - 1] = 1;
-                visitedMap[Y, X - 1] = 1;
-                traverse(X - 1, Y, ref visitedMap, ref edgeMap, ref resultMap);
-                return;
-            }
-
-            //4
-            if (edgeMap[Y - 1, X - 1] == 2)
-            {
-                resultMap[Y - 1, X - 1] = 1;
-                visitedMap[Y - 1, X - 1] = 1;
-                traverse(X - 1, Y - 1, ref visitedMap, ref edgeMap, ref resultMap);
-                return;
-            }
-
-            //5
-            if (edgeMap[Y - 1, X] == 2)
-            {
-                resultMap[Y - 1, X] = 1;
-                visitedMap[Y - 1, X] = 1;
-                traverse(X, Y - 1, ref visitedMap, ref edgeMap, ref resultMap);
-                return;
-            }
-
-            //6
-            if (edgeMap[Y - 1, X + 1] == 2)
-            {
-                resultMap[Y - 1, X + 1] = 1;
-                visitedMap[Y - 1, X + 1] = 1;
-                traverse(X + 1, Y - 1, ref visitedMap, ref edgeMap, ref resultMap);
-                return;
-            }
-
-            //7
-            if (edgeMap[Y, X + 1] == 2)
-            {
-                resultMap[Y, X + 1] = 1;
-                visitedMap[Y, X + 1] = 1;
-                traverse(X + 1, Y, ref visitedMap, ref edgeMap, ref resultMap);
-                return;
-            }
-
-            //8
-            if (edgeMap[Y + 1, X -+ 1] == 2)
-            {
-                resultMap[Y + 1, X + 1] = 1;
-                visitedMap[Y + 1, X + 1] = 1;
-                traverse(X + 1, Y + 1, ref visitedMap, ref edgeMap, ref resultMap);
-                return;
-            }
+            throw new NotImplementedException();
         }
         #endregion
 
@@ -707,74 +383,527 @@ namespace ImageProcessing
         }
         #endregion
 
-        #region Convex Defects
-        private static int M_REDUCTION = 4;
+        #region Edge Detection
+        //Sobel filters
+        private static int[,] m_xFilter = {{-1, 0, 1},
+                                           {-2, 0, 2},
+                                           {-1, 0, 1}};
+
+        private static int[,] m_yFilter = {{-1, -2, -1},
+                                           { 0,  0,  0},
+                                           { 1,  2,  1}};
 
         /// <summary>
-        /// Using snakes from each line of the hull towards the center to find
-        ///  the convex defects 
+        /// use the Canny edge detection algorithm
         /// </summary>
-        /// <param name="p_convexHull">The hull around the datapoints</param>
-        /// <param name="p_interiorPoints"></param>
-        /// <param name="p_size"></param>
-        /// <returns></returns>
-        public static List<Point> getConvexDefects(List<Point> p_convexHull, List<Point> p_interiorPoints,
-                                                   Size p_size)
+        /// <seealso cref="http://www.codeproject.com/Articles/93642/Canny-Edge-Detection-in-C"/>
+        /// <see cref="http://softwarebydefault.com/2013/05/11/image-edge-detection/"/>
+        /// <param name="p_image">Image to find edges on</param>
+        /// <returns>Bitmap with edges</returns>
+        public static Image findEdges(Image p_image)
         {
-            //Create a task list
-            Task<SnakeResults>[] tasks = new Task<SnakeResults>[p_convexHull.Count];
+            //step 0
+            //Convert an image to an byte array
+            Image edgeImage = new Bitmap(p_image);
+            byte[] resultBuffer = new byte[edgeImage.Width * edgeImage.Height];
+            byte[] pixelBuffer;
+            BitmapData data = BitmapManip.lockBitmap(out pixelBuffer, edgeImage);
+            convert2GreyScale(ref pixelBuffer);
 
-            //Populate the snake navigation map
-            byte[,] snakeMap = new byte[p_size.Height / M_REDUCTION, p_size.Width / M_REDUCTION];
-            populateSnakeMap(ref snakeMap, p_interiorPoints);
+            //step 1 blur image
+            blurImage(ref pixelBuffer, edgeImage.Width, ref resultBuffer);
 
-            Point[] reducedConvexHull = p_convexHull.ToArray();
+            //TODO: comment this out and replace with this (pixelBuffer = resultBuffer;)
+            //Check the images as I go strictly for testing
+            BitmapManip.unlockBitmap(ref resultBuffer, ref data, edgeImage);
+            //edgeImage.Save("SmoothedImage.bmp");
+            data = BitmapManip.lockBitmap(out pixelBuffer, edgeImage);
 
-            for (int i = 0; i < p_convexHull.Count; ++i)
+            //step 2 apply sobel filters to find gradients
+            float[,] angleMap = new float[edgeImage.Height, edgeImage.Width];
+            findGradients(ref pixelBuffer, edgeImage.Width, ref resultBuffer, ref angleMap);
+
+            //TODO: comment this out and replace with this (pixelBuffer = resultBuffer;)
+            BitmapManip.unlockBitmap(ref resultBuffer, ref data, edgeImage);
+            //edgeImage.Save("FilteredImage.bmp");
+            data = BitmapManip.lockBitmap(out pixelBuffer, edgeImage);
+
+            //step 3 clear out all non local maximum values
+            nonMaxSuppression(ref pixelBuffer, edgeImage.Width, ref resultBuffer, angleMap);
+
+            //TODO: comment this out and replace with this (pixelBuffer = resultBuffer;)
+            BitmapManip.unlockBitmap(ref resultBuffer, ref data, edgeImage);
+            //scan0edgeImage.Save("NonMaxSupressImage.bmp");
+            data = BitmapManip.lockBitmap(out pixelBuffer, edgeImage);
+
+            //Step 4 dual edge thresholding
+            thresholding(ref pixelBuffer, edgeImage.Width, ref resultBuffer);
+
+            //thresholding doens't give a human recognizable output
+            BitmapManip.unlockBitmap(ref resultBuffer, ref data, edgeImage);
+            data = BitmapManip.lockBitmap(out pixelBuffer, edgeImage);
+
+            //Step 5 HysteresisThresholding
+            hysterisisThresholding(ref pixelBuffer, edgeImage.Width, ref resultBuffer);
+
+            //Restore byte array to image
+            BitmapManip.unlockBitmap(ref resultBuffer, ref data, edgeImage);
+            edgeImage.Save("Thresholding.bmp");
+
+            return edgeImage;
+        }
+
+
+
+        /// <summary>
+        /// The first step of Canny edge detection
+        /// Filter the image we do this by applying a gausian filter over the image
+        /// </summary>
+        /// <param name="p_image">byte array of the image to blur</param>
+        /// <param name="p_width">width in pixels of the image</param>
+        /// <param name="p_resultImage"></param>
+        private static void blurImage(ref byte[] p_image, int p_width, ref byte[] p_resultImage)
+        {
+            //setup gaussian kernel stuff
+            int[,] gausianKernel;
+            int kernalSize = 5;
+            int sigma = 1;
+
+            //Populate gaussian filter
+            int weight = generateGausianKernel(kernalSize, sigma, out gausianKernel);
+
+            //perform filtering
+            int limit = kernalSize / 2;
+            double red, green, blue;
+            int byteOffset, filterOffset;
+            p_resultImage = p_image;
+
+            int height = p_image.Length / (p_width * 4);
+
+            for (int y = limit; y < height - limit; ++y)
+                for (int x = limit; x < p_width - limit; ++x)
+                {
+                    //red = 0;
+                    //green = 0;
+                    blue = 0;
+                    byteOffset = ((y * p_width) + x) * 4;
+
+                    for (int filterY = -limit; filterY <= limit; ++filterY)
+                        for (int filterX = -limit; filterX <= limit; ++filterX)
+                        {
+                            //sum all the values in the gausian filter
+                            filterOffset = byteOffset + ((filterY * p_width) + filterX) * 4;
+                            blue += (double)p_image[filterOffset] *
+                                        gausianKernel[limit + filterY, limit + filterX];
+                            //green += (double)(p_image[filterOffset + 1]) *
+                            //            gausianKernel[limit + filterY, limit + filterX];
+                            //red += (double)(p_image[filterOffset + 2]) *
+                            //            gausianKernel[limit + filterY, limit + filterX];
+                        }
+                    //Average them so they are within the byte range
+                    blue /= weight;
+                    //green /= weight;
+                    //red /= weight;
+
+                    //Put them into the result image
+                    p_resultImage[byteOffset] = p_resultImage[byteOffset + 1] =
+                        p_resultImage[byteOffset + 2] = (byte)blue;
+
+                    //p_resultImage[byteOffset + 1] = (byte)green;
+                    //p_resultImage[byteOffset + 2] = (byte)red;
+                    p_resultImage[byteOffset + 3] = 255;
+                }
+        }
+
+        /// <summary>
+        /// The kernel for the filter to be run over the data
+        /// </summary>
+        /// <param name="p_sizeOfKernel"></param>
+        /// <param name="p_sigma"></param>
+        /// <param name="p_gKernel"></param>
+        /// <returns></returns>
+        private static int generateGausianKernel(int p_sizeOfKernel, float p_sigma, out int[,] p_gKernel)
+        {
+            double pi = (double)Math.PI;
+
+            //kernel is temporary to find precise 
+            double[,] kernel = new double[p_sizeOfKernel, p_sizeOfKernel];
+            p_gKernel = new int[p_sizeOfKernel, p_sizeOfKernel];
+
+            double D2 = p_sigma * p_sigma * 2;
+            double D1 = 1 / (pi * D2);
+
+            int sum, mult;
+            double min = 1000; //initialize min to something large
+            int upper = p_sizeOfKernel / 2;
+            int lower = -upper;
+
+            //Find min value
+            for (int i = lower; i <= upper; ++i)
+                for (int j = lower; j <= upper; ++j)
+                {
+                    kernel[upper + i, upper + j] = ((1 / D1) * (double)Math.Exp(
+                                                          -(i * i + j * j) / D2));
+                    if (kernel[upper + i, upper + j] < min)
+                        min = kernel[upper + i, upper + j];
+                }
+
+            mult = (int)(1 / min);
+            sum = 0;
+
+            //Calculate sum adjusting if the min was between 0 and 1
+            if (min > 0 && min < 1)
             {
-                Point start = new Point(reducedConvexHull[i].X /= M_REDUCTION,
-                                  reducedConvexHull[i].Y /= M_REDUCTION);
-                Point end = new Point(reducedConvexHull[(i + 1) % p_convexHull.Count].X /= M_REDUCTION,
-                                reducedConvexHull[(i + 1) % p_convexHull.Count].Y /= M_REDUCTION);
-
-                //Start a task for each line in the hull to find 
-                tasks[i] = Task.Factory.StartNew(() => runSnakes(start, end, snakeMap));
+                for (int i = lower; i <= upper; ++i)
+                    for (int j = lower; j <= upper; ++j)
+                    {
+                        p_gKernel[upper + i, upper + j] = (int)Math.Round(
+                            kernel[upper + i, upper + j] * mult, 0);
+                        sum += p_gKernel[upper + i, upper + j];
+                    }
+            }
+            else
+            {
+                for (int i = lower; i <= upper; ++i)
+                    for (int j = lower; j <= upper; ++j)
+                    {
+                        p_gKernel[upper + i, upper + j] = (int)Math.Round(
+                            kernel[upper + i, upper + j], 0);
+                        sum += p_gKernel[upper + i, upper + j];
+                    }
             }
 
-            //Wait for the tasks to finish
-            Task.WaitAll(tasks); 
-
-            //return a list of the points returned
-            return organizePoints(tasks.Select(x => x.Result).ToList());
+            return sum;
         }
 
         /// <summary>
-        /// Populates the navigation map for the snakes.
+        /// Apply Sobel filtering to the smoothed image
         /// </summary>
-        /// <param name="p_snakeMap">The map to be populated</param>
-        /// <param name="p_interiorPoints">Points to reduce into snake map</param>
-        private static void populateSnakeMap(ref byte[,] p_snakeMap, List<Point> p_interiorPoints)
+        /// <param name="p_image">Byte array of Smoothed image</param>
+        /// <param name="p_width">width in pixels</param>
+        /// <param name="p_resultImage">Byte array to write the results to</param>
+        private static void findGradients(ref byte[] p_image, int p_width, ref byte[] p_resultImage, ref float[,] p_angleMap)
         {
-            //put all the points into an array, reducing the size for speed and accuracy
-            foreach (Point point in p_interiorPoints)
-                p_snakeMap[point.Y / M_REDUCTION, point.X / M_REDUCTION] = 1;
+            //variables needed for this funciton
+            int limit = m_xFilter.GetLength(0) / 2;
+            double blueX, greenX, redX;
+            double blueY, greenY, redY;
+            double blueTot, greenTot, redTot;
+            int byteOffset, filterOffset, xFilterVal, yFilterVal;
+            float pi = (float)Math.PI;
+
+            int height = p_image.Length / (p_width * 4);
+
+            //Iterate through pixels
+            for (int y = limit; y < height - limit; ++y)
+                for (int x = limit; x < p_width - limit; ++x)
+                {
+                    blueX = greenX = redX = 0.0;
+                    blueY = greenY = redY = 0.0;
+                    blueTot = greenTot = redTot = 0.0;
+
+                    byteOffset = ((y * p_width) + x) * 4;
+
+                    //Apply sobel filters
+                    for (int filterY = -limit; filterY <= limit; ++filterY)
+                        for (int filterX = -limit; filterX <= limit; ++filterX)
+                        {
+                            filterOffset = byteOffset + ((filterY * p_width) + filterX) * 4;
+                            xFilterVal = m_xFilter[limit + filterY, limit + filterX];
+                            yFilterVal = m_yFilter[limit + filterY, limit + filterX];
+
+                            blueX += (double)p_image[filterOffset] * xFilterVal;
+                            //greenX += (double)p_image[filterOffset + 1] * xFilterVal;
+                            //redX   += (double)p_image[filterOffset + 2] * xFilterVal;
+
+                            blueY += (double)p_image[filterOffset] * yFilterVal;
+                            //greenY += (double)p_image[filterOffset + 1] * yFilterVal;
+                            //redX   += (double)p_image[filterOffset + 2] * yFilterVal;
+                        }
+
+                    //Take the cartesian product of colors
+                    blueTot = Math.Sqrt((blueX * blueX) +
+                                        (blueY * blueY));
+                    //greenTot = Math.Sqrt((greenX * greenX) +
+                    //                     (greenY * greenY));
+                    //redTot = Math.Sqrt((redX * redX) +
+                    //                   (redY * redY));
+
+                    p_resultImage[byteOffset] = p_resultImage[byteOffset + 1] =
+                        p_resultImage[byteOffset + 2] = (byte)blueTot;
+                    //p_resultImage[byteOffset + 1] = (byte)greenTot;
+                    //p_resultImage[byteOffset + 2] = (byte)redTot;
+                    p_resultImage[byteOffset + 3] = 255;
+
+                    if (blueX == 0)
+                        p_angleMap[y, x] = 90f;
+                    else
+                        p_angleMap[y, x] = (float)Math.Abs(Math.Atan(blueY / blueX) * 180 / pi);
+                }
         }
 
         /// <summary>
-        /// Gradually moves points of the snake into the defect areas of the hull
+        /// This removes the pixels that arent edges
         /// </summary>
-        /// <param name="p_point1">Starting point</param>
-        /// <param name="p_point2">Ending point</param>
-        /// <returns></returns>
-        private static SnakeResults runSnakes(Point p_point1, Point p_point2, byte[,] p_snakeMap)
+        /// <param name="p_image">Gradient Image byte array</param>
+        /// <param name="p_width">width in pixels of image</param>
+        /// <param name="p_resultBuffer">byte array to store results</param>
+        /// <param name="p_angleMap">tangents of the angles, used in Canny edge deteciton</param>
+        private static void nonMaxSuppression(ref byte[] p_image, int p_width, ref byte[] p_resultBuffer, float[,] p_angleMap)
         {
-            Snake snake = new Snake(p_point1, p_point2, p_snakeMap);
-            return snake.getResults();
+            int limit = m_xFilter.GetLength(0) / 2; //Because my sobel filter is 3 wide
+            int height = p_image.Length / (p_width * 4);
+            int byteOffset, posTanOffset, negTanOffset;
+
+            for (int y = limit; y < height - limit; ++y)
+                for (int x = limit; x < p_width - limit; ++x)
+                {
+                    byteOffset = ((y * p_width) + x) * 4;
+
+                    //Horizantal edge
+                    if (p_angleMap[y, x] <= 22.5 || p_angleMap[y, x] > 157.5)
+                    {
+                        posTanOffset = byteOffset + 4;
+                        negTanOffset = byteOffset - 4;
+                        if (p_image[byteOffset] < p_image[posTanOffset] ||
+                            p_image[byteOffset] < p_image[negTanOffset])
+                        {
+                            p_resultBuffer[byteOffset] =
+                                p_resultBuffer[byteOffset + 1] =
+                                p_resultBuffer[byteOffset + 2] = 0;
+                            p_resultBuffer[byteOffset + 3] = 255;
+                        }
+                    }
+                    //+45 degree edge
+                    else if (p_angleMap[y, x] <= 67.5)
+                    {
+                        posTanOffset = byteOffset + (p_width - 1) * 4;
+                        negTanOffset = byteOffset - (p_width - 1) * 4;
+                        if (p_image[byteOffset] < p_image[posTanOffset] ||
+                            p_image[byteOffset] < p_image[negTanOffset])
+                        {
+                            p_resultBuffer[byteOffset] =
+                                p_resultBuffer[byteOffset + 1] =
+                                p_resultBuffer[byteOffset + 2] = 0;
+                            p_resultBuffer[byteOffset + 3] = 255;
+                        }
+                    }
+                    //Vertical edge
+                    else if (p_angleMap[y, x] <= 112.5)
+                    {
+                        posTanOffset = byteOffset + p_width * 4;
+                        negTanOffset = byteOffset - p_width * 4;
+                        if (p_image[byteOffset] < p_image[posTanOffset] ||
+                            p_image[byteOffset] < p_image[negTanOffset])
+                        {
+                            p_resultBuffer[byteOffset] =
+                                p_resultBuffer[byteOffset + 1] =
+                                p_resultBuffer[byteOffset + 2] = 0;
+                            p_resultBuffer[byteOffset + 3] = 255;
+                        }
+                    }
+                    //-45 degree edge
+                    else
+                    {
+                        posTanOffset = byteOffset + (p_width + 1) * 4;
+                        negTanOffset = byteOffset - (p_width + 1) * 4;
+                        if (p_image[byteOffset] < p_image[posTanOffset] ||
+                            p_image[byteOffset] < p_image[negTanOffset])
+                        {
+                            p_resultBuffer[byteOffset] =
+                                p_resultBuffer[byteOffset + 1] =
+                                p_resultBuffer[byteOffset + 2] = 0;
+                            p_resultBuffer[byteOffset + 3] = 255;
+                        }
+                    }
+                }
         }
 
-        private static List<Point> organizePoints(List<SnakeResults> list)
+        /// <summary>
+        /// This is a rather simple process of only populating the result buffer with values that exceed 
+        /// 
+        /// </summary>
+        /// <param name="p_image"></param>
+        /// <param name="p_width"></param>
+        /// <param name="p_resultBuffer"></param>
+        private static void thresholding(ref byte[] p_image, int p_width, ref byte[] p_resultBuffer)
         {
-            throw new NotImplementedException();
+            int limit = m_xFilter.GetLength(0) / 2;
+            int height = p_image.Length / (p_width * 4);
+            int byteOffset;
+
+            //Determine the thresholds
+            float maxThreshold = otsuThreshold(p_image) * 0.4f;  //Otsu's algorithm cut out too much
+            float minThreshold = 0.5f * maxThreshold;
+
+            //Dual thresholding
+            for (int y = limit; y < height - limit; ++y)
+                for (int x = limit; x < p_width - limit; ++x)
+                {
+                    byteOffset = ((y * p_width) + x) * 4;
+
+                    //set flags for strong and weak edges, 1 and 2 repectively
+                    if (p_image[byteOffset] >= maxThreshold)
+                        p_resultBuffer[byteOffset] = 1;
+
+                    else if (p_image[byteOffset] >= minThreshold)
+                        p_resultBuffer[byteOffset] = 2;
+
+                    else
+                        p_resultBuffer[byteOffset] = 0;
+                }
+        }
+
+
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="p_image"></param>
+        /// <param name="p_width"></param>
+        /// <param name="p_resultBuffer"></param>
+        private static void hysterisisThresholding(ref byte[] p_image, int p_width, ref byte[] p_resultBuffer)
+        {
+            int limit = m_xFilter.GetLength(0) / 2;
+            int height = p_image.Length / (p_width * 4);
+            int byteOffset;
+
+            int[,] edgeMap = new int[height, p_width];
+            int[,] resultMap = new int[height, p_width];
+            int[,] visitedMap = new int[height, p_width];
+
+            //populate edgemap
+            for (int y = limit; y < height - limit; ++y)
+                for (int x = limit; x < p_width - limit; ++x)
+                {
+                    byteOffset = ((y * p_width) + x) * 4;
+
+                    if (p_image[byteOffset] == 1)
+                        edgeMap[y, x] = 1;
+                    else if (p_image[byteOffset] == 2)
+                        edgeMap[y, x] = 2;
+                }
+
+            resultMap = edgeMap;
+
+            //Perform traversal process
+            for (int y = limit; y < height - limit; ++y)
+                for (int x = limit; x < p_width - limit; ++x)
+                {
+                    byteOffset = ((y * p_width) + x) * 4;
+
+                    if (p_image[byteOffset] == 1)
+                    {
+                        traverse(x, y, ref visitedMap, ref edgeMap, ref resultMap);
+                        visitedMap[y, x] = 1;
+                    }
+                }
+
+            //Write results to resultbuffer
+            for (int y = limit; y < height - limit; ++y)
+                for (int x = limit; x < p_width - limit; ++x)
+                {
+                    byteOffset = ((y * p_width) + x) * 4;
+
+                    if (resultMap[y, x] == 1)
+                    {
+                        p_resultBuffer[byteOffset] = p_resultBuffer[byteOffset + 1] =
+                            p_resultBuffer[byteOffset + 2] = 255;
+                    }
+                    else
+                    {
+                        p_resultBuffer[byteOffset] = p_resultBuffer[byteOffset + 1] =
+                            p_resultBuffer[byteOffset + 2] = 0;
+                    }
+
+                    p_resultBuffer[byteOffset + 3] = 255;
+                }
+        }
+
+        /// <summary>
+        /// A recursive walking algorithm to ensure all weak edges are attached
+        ///  to strong edges
+        /// </summary>
+        /// <param name="X">X position</param>
+        /// <param name="Y">Y position</param>
+        /// <param name="visitedMap">Map to determine if the traversal has visited this square</param>
+        /// <param name="p_width">width of image in pixels</param>
+        private static void traverse(int X, int Y, ref int[,] visitedMap, ref int[,] edgeMap, ref int[,] resultMap)
+        {
+            if (visitedMap[Y, X] == 1)
+                return;
+
+            //1
+            if (edgeMap[Y + 1, X] == 2)
+            {
+                resultMap[Y + 1, X] = 1;
+                visitedMap[Y + 1, X] = 1;
+                traverse(X, Y + 1, ref visitedMap, ref edgeMap, ref resultMap);
+                return;
+            }
+
+            //2
+            if (edgeMap[Y + 1, X - 1] == 2)
+            {
+                resultMap[Y + 1, X - 1] = 1;
+                visitedMap[Y + 1, X - 1] = 1;
+                traverse(X - 1, Y + 1, ref visitedMap, ref edgeMap, ref resultMap);
+                return;
+            }
+
+            //3
+            if (edgeMap[Y, X - 1] == 2)
+            {
+                resultMap[Y, X - 1] = 1;
+                visitedMap[Y, X - 1] = 1;
+                traverse(X - 1, Y, ref visitedMap, ref edgeMap, ref resultMap);
+                return;
+            }
+
+            //4
+            if (edgeMap[Y - 1, X - 1] == 2)
+            {
+                resultMap[Y - 1, X - 1] = 1;
+                visitedMap[Y - 1, X - 1] = 1;
+                traverse(X - 1, Y - 1, ref visitedMap, ref edgeMap, ref resultMap);
+                return;
+            }
+
+            //5
+            if (edgeMap[Y - 1, X] == 2)
+            {
+                resultMap[Y - 1, X] = 1;
+                visitedMap[Y - 1, X] = 1;
+                traverse(X, Y - 1, ref visitedMap, ref edgeMap, ref resultMap);
+                return;
+            }
+
+            //6
+            if (edgeMap[Y - 1, X + 1] == 2)
+            {
+                resultMap[Y - 1, X + 1] = 1;
+                visitedMap[Y - 1, X + 1] = 1;
+                traverse(X + 1, Y - 1, ref visitedMap, ref edgeMap, ref resultMap);
+                return;
+            }
+
+            //7
+            if (edgeMap[Y, X + 1] == 2)
+            {
+                resultMap[Y, X + 1] = 1;
+                visitedMap[Y, X + 1] = 1;
+                traverse(X + 1, Y, ref visitedMap, ref edgeMap, ref resultMap);
+                return;
+            }
+
+            //8
+            if (edgeMap[Y + 1, X - +1] == 2)
+            {
+                resultMap[Y + 1, X + 1] = 1;
+                visitedMap[Y + 1, X + 1] = 1;
+                traverse(X + 1, Y + 1, ref visitedMap, ref edgeMap, ref resultMap);
+                return;
+            }
         }
         #endregion
 
@@ -804,105 +933,6 @@ namespace ImageProcessing
         }
 
         /// <summary>
-        /// This uses the two pass method to search for blobs
-        /// </summary>
-        /// <seealso cref="https://en.wikipedia.org/wiki/Connected-component_labeling"/>
-        /// <param name="p_data"></param>
-        /// <param name="p_buffer"></param>
-        /// <returns>All blobs found from search</returns>
-        static public Dictionary<int, List<Point>> findBlobs(ref BitmapData p_data, ref byte[] p_buffer)
-        {
-            Dictionary<int, List<Point>> blobs = new Dictionary<int,List<Point>>();
-            Dictionary<int, int> labelMap = new Dictionary<int, int>();
-            //Create and populate a binary map
-            int[,] binMap = new int[p_data.Height, p_data.Width];
-
-            for (int i = 0; i < p_buffer.Length; i += 4)
-                if (p_buffer[i] != 0)
-                    binMap[i / p_data.Stride, (i % p_data.Stride) / 4] = 1;
-
-            //curLabel is not instantiated here because the first pixel will never have a point to the left or above it.
-            //  Therefore it will be instantiated before I use it.
-            ComponentLabel curLabel = null; 
-
-            #region First Pass
-            HashSet<int> searchSpace = new HashSet<int>();
-            int min;
-            //iterate through binmap and find foreground pixels
-            for (int y = 1; y < p_data.Height; ++y)
-                for (int x = 1; x < p_data.Width - 1; ++x)
-                {
-                    if (binMap[y, x] == 1)
-                    {
-                        for (int i = 0; i < 4; ++i)
-                            searchSpace.Add(binMap[y + (i / 3) - 1, x + (i % 3) - 1]);
-
-                        searchSpace.Remove(0); //remove background pixels
-                        searchSpace.Remove(1); //remove first row and last column foreground pixels
-                        switch (searchSpace.Count)
-                        {
-                            case 0:
-                                curLabel = ComponentLabel.getInstance();
-                                break;
-
-                            case 1:
-                                if (curLabel.Id != searchSpace.First())
-                                    curLabel = ComponentLabel.getInstance(searchSpace.First());
-                                break;
-
-                            case 4:
-                            case 3:
-                            case 2: //This is gaurenteed to be two different values from left and top right
-                                 curLabel = ComponentLabel.Union(searchSpace.ToArray());
-                                break;
-
-                            default:
-                                throw new Exception("4 distinct values in blob detection");
-                        }
-
-                        searchSpace.Clear();
-                        binMap[y, x] = curLabel.Id;
-                    }
-                }
-            #endregion
-            #region Second Pass
-            if (curLabel != null)
-            {
-                int root, label;
-                label = curLabel.Id;
-                root = ComponentLabel.Find(label).Id;
-
-                for (int y = 1; y < p_data.Height; ++y)
-                    for (int x = 1; x < p_data.Width - 1; ++x)
-                    {
-                        if (binMap[y, x] != 0)
-                        {
-                            //Store the labels and roots into a map for constant lookup
-                            if (binMap[y, x] != label)
-                            {
-                                label = binMap[y, x];
-
-                                if (!labelMap.ContainsKey(label))
-                                    labelMap[label] = ComponentLabel.Find(label).Id;
-
-                                root = labelMap[label];
-                            }
-                            //if the blob for this root doesn't exist create it
-                            if (!blobs.ContainsKey(root))
-                                blobs[root] = new List<Point>();
-
-                            blobs[root].Add(new Point(x, y));
-                        }
-                    }
-            }
-            #endregion
-
-            ComponentLabel.dispose();
-
-            return blobs;
-        }
-
-        /// <summary>
         /// This returns the place in the image
         /// </summary>
         /// <param name="p_x"></param>
@@ -913,6 +943,13 @@ namespace ImageProcessing
         static public int getOffset(int p_x, int p_y, int p_width, int p_depth)
         {
             return ((p_y * p_width) + p_x) * p_depth;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static public Point getPoint(int p_offset, int p_width, int p_depth)
+        {
+            return new Point((p_offset % p_width) / p_depth,
+                              p_offset / (p_width * p_depth));
         }
 
         /// <summary>

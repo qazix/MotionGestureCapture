@@ -11,7 +11,7 @@ namespace MotionGestureProcessing
 {
     public class Processing
     {
-        public delegate void ImageReadyHandler(imageData data);
+        public delegate void ImageReadyHandler(ImageData data);
         public event ImageReadyHandler IsolationImageFilled;
         public event ImageReadyHandler PCAImageFilled;
         public event ImageReadyHandler GesturesImageFilled;
@@ -32,9 +32,9 @@ namespace MotionGestureProcessing
         public Semaphore PCAToGestures { get; set; }
         public Mutex feedBackData { get; set; }
 
-        private imageData m_toIsolationImage;
+        private ImageData m_toIsolationImage;
 
-        public imageData ToIsolationImage { get { return m_toIsolationImage; } 
+        public ImageData ToIsolationImage { get { return m_toIsolationImage; } 
             set{
                 m_toIsolationImage = value;
                 if (IsolationImageFilled != null)
@@ -43,7 +43,7 @@ namespace MotionGestureProcessing
                 }
             }
         }
-        public imageData ToPCAImage { 
+        public ImageData ToPCAImage { 
             set {
                 IsolationToPCA.WaitOne();
                 if (PCAImageFilled != null)
@@ -55,7 +55,7 @@ namespace MotionGestureProcessing
             }
         }
 
-        public imageData ToGesturesImage {
+        public ImageData ToGesturesImage {
             set{
                 IsolationToPCA.Release();
                 PCAToGestures.WaitOne();
@@ -66,7 +66,7 @@ namespace MotionGestureProcessing
             } 
         }
 
-        public imageData ToReturnImage { 
+        public ImageData ToReturnImage { 
             set{
                 PCAToGestures.Release();
                 ReturnImageFilled(value);
@@ -118,7 +118,7 @@ namespace MotionGestureProcessing
                 m_gesture.initialize();
             }
 
-            ToIsolationImage = new imageData(true, await m_camCapture.grabImage());
+            ToIsolationImage = new ImageData(true, await m_camCapture.grabImage());
             m_handIso.initialize(ToIsolationImage);
 
             IsInitialized = true;
@@ -153,7 +153,7 @@ namespace MotionGestureProcessing
         public async void oneShot()
         {
             if (m_camCapture.Running)
-                ToIsolationImage = new imageData(false, await m_camCapture.grabImage());
+                ToIsolationImage = new ImageData(false, await m_camCapture.grabImage());
         }
 
         /// <summary>

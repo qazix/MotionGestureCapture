@@ -98,7 +98,7 @@ namespace ImageProcessing
                     //Turn clockwise and try again
                     changeFacing(1); 
                     if (!m_curPoint.Equals(m_startPoint) || m_curFace != m_startFace)
-                        increment(ref p_next, ++p_iterations);
+                        return increment(ref p_next, ++p_iterations);
                 }
 
                 //The end condition is when the tracer is on the starting position and facing the same direction

@@ -948,8 +948,59 @@ namespace ImageProcessing
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static public Point getPoint(int p_offset, int p_width, int p_depth)
         {
-            return new Point((p_offset % p_width) / p_depth,
+            return new Point((p_offset / p_depth) % p_width,
                               p_offset / (p_width * p_depth));
+        }
+
+        /// <summary>
+        /// This converts the image data into data points with x and y coordinates.
+        /// I'm using a list becuase this should be a sparse dataset.
+        /// </summary>
+        /// <param name="p_buffer">image as bytes</param>
+        /// <param name="p_data">BitmapData</param>
+        /// <returns>list of (x, y) tuples</returns>
+        public static List<Point> getDataPoints(ref BitmapData p_data, ref byte[] p_buffer)
+        {
+            int x, y;
+            int depth = p_data.Stride / p_data.Width;
+            List<Point> dataPoints = new List<Point>();
+
+            //I am iterating this way instead of with a double for loop with x and y because
+            // this should be a sparse matrix
+            for (int offset = 0; offset < p_buffer.Length; offset += depth)
+            {
+                if (p_buffer[offset] > 0)
+                {
+                    y = offset / p_data.Stride;
+                    x = (offset % p_data.Stride) / depth;
+                    dataPoints.Add(new Point(x, y));
+                }
+            }
+
+            return dataPoints;
+        }
+
+        /// <summary>
+        /// This updates the buffer to be representative of the datapoints
+        /// </summary>
+        /// <param name="p_dataPoints"></param>
+        /// <param name="p_data"></param>
+        /// <param name="p_buffer"></param>
+        public static void updateBuffer(List<Point> p_dataPoints, ref BitmapData p_data, ref byte[] p_buffer)
+        {
+            byte[] newBuffer = new byte[p_buffer.Length];
+            int offset;
+
+            foreach (Point point in p_dataPoints)
+            {
+                offset = ImageProcess.getOffset(point.X, point.Y, p_data.Width, 4);
+                newBuffer[offset] = newBuffer[offset + 1] = newBuffer[offset + 2] = 255;
+            }
+
+            for (offset = 3; offset < p_buffer.Length; offset += 4)
+                newBuffer[offset] = 255;
+
+            Buffer.BlockCopy(newBuffer, 0, p_buffer, 0, p_buffer.Length);
         }
 
         /// <summary>

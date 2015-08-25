@@ -42,29 +42,34 @@ namespace MotionGestureProcessing
         /// <param name="p_imgData"></param>
         protected override async void doWork(Object p_imgData)
         {
-            Gestures gesture = Gestures.NoGesture;
+            if (((ImageData)p_imgData).ConvexHull != null)
+            {
+                Gestures gesture = Gestures.NoGesture;
 
-            byte[] buffer;
+                byte[] buffer;
+                BitmapData data = BitmapManip.lockBitmap(out buffer, ((ImageData)p_imgData).Image);
 
-            List<Point> convexHull = ImageProcess.getConvexHull(((imageData)p_imgData).Datapoints);
+                List<Point> convexHull = ((ImageData)p_imgData).ConvexHull;
+                List<Point> contour = ImageProcess.getContour(ref data, ref buffer);
 
-            BitmapData data = BitmapManip.lockBitmap(out buffer, ((imageData)p_imgData).Image);
-            drawLines(buffer, data, convexHull);
-            BitmapManip.unlockBitmap(ref buffer, ref data, ((imageData)p_imgData).Image);
-            
-            
-            data = BitmapManip.lockBitmap(out buffer, ((imageData)p_imgData).Image);
-            ((imageData)p_imgData).Image.Save("convexhull.bmp");
-            BitmapManip.unlockBitmap(ref buffer, ref data, ((imageData)p_imgData).Image);
-            
+                drawOrientation(data, buffer, ((ImageData)p_imgData).EigenVectors, ((ImageData)p_imgData).Center);
+                drawLines(ref data, ref buffer, convexHull, Color.Yellow);
+                drawLines(ref data, ref buffer, contour, Color.Blue);
+                BitmapManip.unlockBitmap(ref buffer, ref data, ((ImageData)p_imgData).Image);
 
-            List<Point> convexDefects = ImageProcess.getConvexDefects(convexHull, ((imageData)p_imgData).Datapoints,
-                                                          new Size(((imageData)p_imgData).Image.Width,
-                                                                   ((imageData)p_imgData).Image.Height));
+                /*
+                data = BitmapManip.lockBitmap(out buffer, ((imageData)p_imgData).Image);
+                ((imageData)p_imgData).Image.Save("convexhull.bmp");
+                BitmapManip.unlockBitmap(ref buffer, ref data, ((imageData)p_imgData).Image);
+                */
 
+                //List<Point> convexDefects = ImageProcess.getConvexDefects(convexHull, ((imageData)p_imgData).Datapoints,
+                //                                              new Size(((imageData)p_imgData).Image.Width,
+                //                                                       ((imageData)p_imgData).Image.Height));
+            }
             
             //writeGesture(gesture);
-            Processing.getInstance().ToReturnImage = (imageData)p_imgData;
+            Processing.getInstance().ToReturnImage = (ImageData)p_imgData;
         }
 
         

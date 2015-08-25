@@ -11,8 +11,6 @@ namespace MotionGestureProcessing
 {
     public abstract class Process
     {
-
-
         protected abstract void setupListener();
 
         /// <summary>
@@ -59,7 +57,7 @@ namespace MotionGestureProcessing
         /// <param name="p_buffer"></param>
         /// <param name="p_data"></param>
         /// <param name="p_vectors"></param>
-        protected void drawOrientation(byte[] p_buffer, BitmapData p_data, double[,] p_vectors, Point p_center)
+        protected void drawOrientation(BitmapData p_data, byte[] p_buffer, double[,] p_vectors, Point p_center)
         {
             double[] primPos = new double[2];
             double[] primNeg = new double[2];
@@ -132,12 +130,12 @@ namespace MotionGestureProcessing
         /// Takes a list of points and connects the dots
         /// </summary>
         /// <param name="p_lines"></param>
-        protected void drawLines(byte[] p_buffer, BitmapData p_data, List<Point> p_lines)
+        protected void drawLines(ref BitmapData p_data, ref byte[] p_buffer, List<Point> p_lines, Color p_color)
         {
             int i;
             for (i = 0; i < p_lines.Count - 1; ++i)
             {
-                drawLine(p_buffer, p_data, p_lines[i], p_lines[i + 1]);   
+                drawLine(ref p_data, ref p_buffer, p_lines[i], p_lines[i + 1], p_color);   
             }
         }
 
@@ -148,7 +146,7 @@ namespace MotionGestureProcessing
         /// <param name="p_data"></param>
         /// <param name="point1"></param>
         /// <param name="point2"></param>
-        private void drawLine(byte[] p_buffer, BitmapData p_data, Point point1, Point point2)
+        private void drawLine(ref BitmapData p_data, ref byte[] p_buffer, Point point1, Point point2, Color p_color)
         {
             double[] curPos = new double[2];
             curPos[0] = point1.X;
@@ -175,8 +173,10 @@ namespace MotionGestureProcessing
                 if (valid)
                 {
                     offset = (((int)curPos[1] * p_data.Width) + (int)curPos[0]) * depth;
-                    p_buffer[offset + 2] = 0;
-                    p_buffer[offset] = p_buffer[offset + 1] = 255;
+
+                    p_buffer[offset] = p_color.B;
+                    p_buffer[offset + 1] = p_color.G;
+                    p_buffer[offset + 2] = p_color.R;
 
                     curPos[0] += deltaX;
                     curPos[1] += deltaY;

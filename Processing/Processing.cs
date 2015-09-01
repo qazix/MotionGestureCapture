@@ -13,6 +13,7 @@ namespace MotionGestureProcessing
     {
         public delegate void ImageReadyHandler(ImageData data);
         public event ImageReadyHandler IsolationImageFilled;
+        public event ImageReadyHandler PreprocessImageFilled;
         public event ImageReadyHandler PCAImageFilled;
         public event ImageReadyHandler GesturesImageFilled;
         public event ImageReadyHandler ReturnImageFilled;
@@ -24,11 +25,13 @@ namespace MotionGestureProcessing
         //Hand Isolation class and handler for ready event
         private HandIsolation m_handIso;
         private HandIsolation.ProcessReadyHandler m_HIHandler;
+        private Preprocessing m_preProc;
         private PCA m_PCA;
         private Gesture m_gesture;
 
         public bool IsInitialized { get; set; }
-        public Semaphore IsolationToPCA { get; set; }
+        public Semaphore IsolationToPreprocess { get; set; }
+        public Semaphore PreprocessToPCA { get; set; }
         public Semaphore PCAToGestures { get; set; }
         public Mutex feedBackData { get; set; }
 
@@ -41,11 +44,25 @@ namespace MotionGestureProcessing
                 {
                     IsolationImageFilled(value);
                 }
+                else
+                    ToPreProcessing = value;
+            }
+        }
+
+        public ImageData ToPreProcessing
+        {
+            set {
+                IsolationToPreprocess.WaitOne();
+                if (PreprocessImageFilled != null)
+                    PreprocessImageFilled(value);
+                else
+                    ToPCAImage = value;
             }
         }
         public ImageData ToPCAImage { 
             set {
-                IsolationToPCA.WaitOne();
+                IsolationToPreprocess.Release();
+                PreprocessToPCA.WaitOne();
                 if (PCAImageFilled != null)
                 {
                     PCAImageFilled(value);
@@ -57,7 +74,7 @@ namespace MotionGestureProcessing
 
         public ImageData ToGesturesImage {
             set{
-                IsolationToPCA.Release();
+                PreprocessToPCA.Release();
                 PCAToGestures.WaitOne();
                 if (GesturesImageFilled != null)
                     GesturesImageFilled(value);
@@ -80,11 +97,13 @@ namespace MotionGestureProcessing
         private Processing()
         {
             m_camCapture = CamCapture.getInstance();
-            IsolationToPCA   = new Semaphore(1, 1);
+            IsolationToPreprocess = new Semaphore(1, 1);
+            PreprocessToPCA  = new Semaphore(1, 1);
             PCAToGestures    = new Semaphore(1, 1);
             feedBackData     = new Mutex();
 
             m_handIso = new HandIsolation();
+            m_preProc = new Preprocessing();
             m_PCA = new PCA();
             m_gesture = new Gesture();
         }
@@ -114,12 +133,14 @@ namespace MotionGestureProcessing
             }
             else
             {
+                m_preProc.initialize();
                 m_PCA.initialize();
                 m_gesture.initialize();
             }
 
-            ToIsolationImage = new ImageData(true, await m_camCapture.grabImage());
-            m_handIso.initialize(ToIsolationImage);
+            //ToIsolationImage = new ImageData(true, await m_camCapture.grabImage());
+            ImageData id = new ImageData(true, await m_camCapture.grabImage());
+            m_handIso.initialize(id);
 
             IsInitialized = true;
             if (toRun)

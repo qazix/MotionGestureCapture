@@ -137,7 +137,7 @@ namespace MotionGestureProcessing
                 BitmapManip.unlockBitmap(ref buffer, ref data, procImage);
 
                 ((ImageData)p_imageData).Image = procImage;
-                Processing.getInstance().ToPCAImage = (ImageData)p_imageData;
+                Processing.getInstance().ToPreProcessing = (ImageData)p_imageData;
 
                 //If someone is listener raise an event
                 if (ProcessReady != null)

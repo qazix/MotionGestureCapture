@@ -149,37 +149,10 @@ namespace ImageProcessing
         /// <param name="p_interiorPoints"></param>
         /// <param name="p_size"></param>
         /// <returns></returns>
-        public static List<Point> getConvexDefects(List<Point> p_convexHull, List<Point> p_interiorPoints,
-                                                   Size p_size)
+        public static void getConvexDefects(List<Point> p_contour, List<Point> p_convexHull,  
+                                                   out List<ConvexDefect> p_defects)
         {
-            /*
-            //Create a task list
-            Task<SnakeResults>[] tasks = new Task<SnakeResults>[p_convexHull.Count];
-
-            //Populate the snake navigation map
-            byte[,] snakeMap = new byte[p_size.Height / M_REDUCTION, p_size.Width / M_REDUCTION];
-            populateSnakeMap(ref snakeMap, p_interiorPoints);
-
-            Point[] reducedConvexHull = p_convexHull.ToArray();
-
-            for (int i = 0; i < p_convexHull.Count; ++i)
-            {
-                Point start = new Point(reducedConvexHull[i].X /= M_REDUCTION,
-                                  reducedConvexHull[i].Y /= M_REDUCTION);
-                Point end = new Point(reducedConvexHull[(i + 1) % p_convexHull.Count].X /= M_REDUCTION,
-                                reducedConvexHull[(i + 1) % p_convexHull.Count].Y /= M_REDUCTION);
-
-                //Start a task for each line in the hull to find 
-                tasks[i] = Task.Factory.StartNew(() => runSnakes(start, end, snakeMap));
-            }
-
-            //Wait for the tasks to finish
-            Task.WaitAll(tasks); 
-
-            //return a list of the points returned
-            return organizePoints(tasks.Select(x => x.Result).ToList());
-             * */
-            return new List<Point>();
+            p_defects = new List<ConvexDefect>();
         }
 
         /// <summary>
@@ -192,23 +165,6 @@ namespace ImageProcessing
             //put all the points into an array, reducing the size for speed and accuracy
             foreach (Point point in p_interiorPoints)
                 p_snakeMap[point.Y / M_REDUCTION, point.X / M_REDUCTION] = 1;
-        }
-
-        /// <summary>
-        /// Gradually moves points of the snake into the defect areas of the hull
-        /// </summary>
-        /// <param name="p_point1">Starting point</param>
-        /// <param name="p_point2">Ending point</param>
-        /// <returns></returns>
-        private static SnakeResults runSnakes(Point p_point1, Point p_point2, byte[,] p_snakeMap)
-        {
-            Snake snake = new Snake(p_point1, p_point2, p_snakeMap);
-            return snake.getResults();
-        }
-
-        private static List<Point> organizePoints(List<SnakeResults> list)
-        {
-            throw new NotImplementedException();
         }
         #endregion
 

@@ -1,4 +1,5 @@
-﻿using System;
+﻿using ImageProcessing;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
@@ -17,6 +18,7 @@ namespace MotionGestureProcessing
         public double[,] EigenVectors { get; set; }
         public double Orientation { get; set; }
         public List<Point> ConvexHull { get; set; }
+        public List<ConvexDefect> ConvexDefects { get; set; }
         public List<Point> Contour { get; set; }
 
         public ImageData(bool p_isInit, Image p_image)

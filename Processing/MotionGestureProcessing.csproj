@@ -40,6 +40,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Drawing.cs" />
     <Compile Include="Gesture.cs" />
     <Compile Include="HandIsolation.cs" />
     <Compile Include="imageData.cs" />

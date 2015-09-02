@@ -53,19 +53,11 @@ namespace MotionGestureProcessing
                 List<ConvexDefect> convexDefects;
                 ImageProcess.getConvexDefects(ref contour, ref convexHull, out convexDefects, threshold);
 
-                byte[] buffer;
-                BitmapData data = BitmapManip.lockBitmap(out buffer, ((ImageData)p_imgData).Image);
-
-                drawOrientation(data, buffer, ((ImageData)p_imgData).EigenVectors, ((ImageData)p_imgData).Center);
-                drawLines(ref data, ref buffer, convexHull, Color.Yellow);
-                drawLines(ref data, ref buffer, contour, Color.Blue);
-                drawDefects(ref data, ref buffer, convexDefects, Color.Orange);
-
-                BitmapManip.unlockBitmap(ref buffer, ref data, ((ImageData)p_imgData).Image);
+                ((ImageData)p_imgData).ConvexDefects = convexDefects;
             }
 
             //writeGesture(gesture);
-            Processing.getInstance().ToReturnImage = (ImageData)p_imgData;
+            Processing.getInstance().ToDrawingImage = (ImageData)p_imgData;
         }        
 
         /// <summary>

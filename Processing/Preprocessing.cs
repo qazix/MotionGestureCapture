@@ -195,7 +195,7 @@ namespace MotionGestureProcessing
         /// <returns></returns>
         private int findWrist(int p_index, ref int[] p_histogram)
         {
-            int end = p_index > 0 ? 0 : p_histogram.Length;
+            int end = p_index > 1 ? 0 : p_histogram.Length;
             int inc = p_index > end ? -1 : 1;
             int maxIndex, minIndex, max, min;
             maxIndex = minIndex = max = -1;

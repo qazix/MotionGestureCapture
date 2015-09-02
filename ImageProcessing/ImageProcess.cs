@@ -149,23 +149,77 @@ namespace ImageProcessing
         /// <param name="p_interiorPoints"></param>
         /// <param name="p_size"></param>
         /// <returns></returns>
-        public static void getConvexDefects(List<Point> p_contour, List<Point> p_convexHull,  
-                                                   out List<ConvexDefect> p_defects)
+        public static void getConvexDefects(ref List<Point> p_contour, ref List<Point> p_convexHull,  
+                                                   out List<ConvexDefect> p_defects, double threshold)
         {
             p_defects = new List<ConvexDefect>();
+            int currentContourPoint = 0;
+            for (int i = 1; i < p_convexHull.Count; ++i)
+            {
+                p_defects.Add(calculateDefect(ref p_contour, ref currentContourPoint, p_convexHull[i - 1], p_convexHull[i]));
+            }
+
+            p_defects.RemoveAll((x) => x.distance < threshold);
         }
 
         /// <summary>
-        /// Populates the navigation map for the snakes.
+        /// Go through and populate the convex defect for two points on a convex hull
         /// </summary>
-        /// <param name="p_snakeMap">The map to be populated</param>
-        /// <param name="p_interiorPoints">Points to reduce into snake map</param>
-        private static void populateSnakeMap(ref byte[,] p_snakeMap, List<Point> p_interiorPoints)
+        /// <param name="p_contour">Contour points</param>
+        /// <param name="p_index">last index of convex hull</param>
+        /// <param name="p_start">start point of convex hull</param>
+        /// <param name="p_end">end point of convex hull</param>
+        /// <returns></returns>
+        private static ConvexDefect calculateDefect(ref List<Point> p_contour, ref int p_index, Point p_start, Point p_end)
         {
-            //put all the points into an array, reducing the size for speed and accuracy
-            foreach (Point point in p_interiorPoints)
-                p_snakeMap[point.Y / M_REDUCTION, point.X / M_REDUCTION] = 1;
+            ConvexDefect cd = new ConvexDefect(p_start, p_end);
+            int endIndex = (p_index + p_contour.Count - 1) % p_contour.Count;
+    
+            //Find the contour point that equals the start point
+            while (!p_contour[p_index].Equals(p_start) && p_index != endIndex)
+            {
+                p_index = (p_index + 1) % p_contour.Count; //The contour line should be cyclic
+            }
+
+            //iterate through each point, minimizing the angle to start and end points
+            //My triangle will be labeled with side a spanning between start and end, then continue clockwise
+            double sideA2 = (p_end.X - p_start.X) * (p_end.X - p_start.X) +
+                            (p_end.Y - p_start.Y) * (p_end.Y - p_start.Y);
+            double sideB2, sideC2, min, angleA;
+            min = Math.PI;
+
+            endIndex = p_index - 1;
+            do
+            {
+                p_index = (p_index + 1) % p_contour.Count;
+                sideB2 = (p_contour[p_index].X - p_end.X) * (p_contour[p_index].X - p_end.X) +
+                         (p_contour[p_index].Y - p_end.Y) * (p_contour[p_index].Y - p_end.Y);
+                sideC2 = (p_contour[p_index].X - p_start.X) * (p_contour[p_index].X - p_start.X) +
+                         (p_contour[p_index].Y - p_start.Y) * (p_contour[p_index].Y - p_start.Y);
+
+                //Law of cosines a^2 = b^2 + c^2 - 2bc * cosA
+                //Solving for A = cos^-1((b^2 + c^2 - a^2) / 2bc)
+                angleA = Math.Acos((sideB2 + sideC2 - sideA2) / (2 * Math.Sqrt(sideB2) * Math.Sqrt(sideC2)));
+                if (angleA < min)
+                {
+                    min = angleA;
+                    cd.DeepestPoint = p_contour[p_index];
+                }
+            }
+            while (!p_contour[p_index].Equals(p_end) && p_index != endIndex);
+
+            //calculate distance from middle of convex hull
+            if (min != Math.PI)
+            {
+                Point midpoint = new Point((p_end.X + p_start.X) / 2, (p_end.Y + p_start.Y) / 2);
+                cd.distance = Math.Sqrt((cd.DeepestPoint.X - midpoint.X) * (cd.DeepestPoint.X - midpoint.X) +
+                                        (cd.DeepestPoint.Y - midpoint.Y) * (cd.DeepestPoint.Y - midpoint.Y));
+            }
+            else
+                cd.distance = 0.0;
+            return cd;
         }
+
         #endregion
 
         #region Convex Hull

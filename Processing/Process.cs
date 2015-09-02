@@ -1,4 +1,5 @@
-﻿using System;
+﻿using ImageProcessing;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Imaging;
@@ -125,6 +126,23 @@ namespace MotionGestureProcessing
             }
             while(valid);
         }
+
+        /// <summary>
+        /// KNows how to use draws lines for convex defects
+        /// </summary>
+        /// <param name="data"></param>
+        /// <param name="buffer"></param>
+        /// <param name="convexDefects"></param>
+        /// <param name="color"></param>
+        protected void drawDefects(ref BitmapData p_data, ref byte[] p_buffer, List<ConvexDefect> p_convexDefects, Color p_color)
+        {
+            foreach (ConvexDefect cd in p_convexDefects)
+            {
+                drawLine(ref p_data, ref p_buffer, cd.StartPoint, cd.DeepestPoint, p_color);
+                drawLine(ref p_data, ref p_buffer, cd.DeepestPoint, cd.EndPoint, p_color);
+            }
+        }
+
 
         /// <summary>
         /// Takes a list of points and connects the dots

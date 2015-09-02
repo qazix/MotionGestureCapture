@@ -9,9 +9,15 @@ namespace ImageProcessing
 {
     public class ConvexDefect
     {
-        public Point Start { get; set; }
-        public Point End { get; set; }
+        public Point StartPoint { get; set; }
+        public Point EndPoint { get; set; }
         public Point DeepestPoint { get; set; }
         public double distance { get; set; }
+
+        public ConvexDefect(Point p_start, Point p_end)
+        {
+            StartPoint = p_start;
+            EndPoint = p_end;
+        }
     }
 }

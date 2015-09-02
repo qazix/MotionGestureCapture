@@ -46,33 +46,27 @@ namespace MotionGestureProcessing
             {
                 Gestures gesture = Gestures.NoGesture;
 
+                List<Point> convexHull = ((ImageData)p_imgData).ConvexHull;
+                List<Point> contour = ((ImageData)p_imgData).Contour;
+                double threshold = ((ImageData)p_imgData).Filter.Height * .25;
+
+                List<ConvexDefect> convexDefects;
+                ImageProcess.getConvexDefects(ref contour, ref convexHull, out convexDefects, threshold);
+
                 byte[] buffer;
                 BitmapData data = BitmapManip.lockBitmap(out buffer, ((ImageData)p_imgData).Image);
-
-                List<Point> convexHull = ((ImageData)p_imgData).ConvexHull;
-                List<Point> contour = ImageProcess.getContour(ref data, ref buffer);
 
                 drawOrientation(data, buffer, ((ImageData)p_imgData).EigenVectors, ((ImageData)p_imgData).Center);
                 drawLines(ref data, ref buffer, convexHull, Color.Yellow);
                 drawLines(ref data, ref buffer, contour, Color.Blue);
+                drawDefects(ref data, ref buffer, convexDefects, Color.Orange);
+
                 BitmapManip.unlockBitmap(ref buffer, ref data, ((ImageData)p_imgData).Image);
-
-                /*
-                data = BitmapManip.lockBitmap(out buffer, ((imageData)p_imgData).Image);
-                ((imageData)p_imgData).Image.Save("convexhull.bmp");
-                BitmapManip.unlockBitmap(ref buffer, ref data, ((imageData)p_imgData).Image);
-                */
-
-                //List<Point> convexDefects = ImageProcess.getConvexDefects(convexHull, ((imageData)p_imgData).Datapoints,
-                //                                              new Size(((imageData)p_imgData).Image.Width,
-                //                                                       ((imageData)p_imgData).Image.Height));
             }
-            
+
             //writeGesture(gesture);
             Processing.getInstance().ToReturnImage = (ImageData)p_imgData;
-        }
-
-        
+        }        
 
         /// <summary>
         /// 

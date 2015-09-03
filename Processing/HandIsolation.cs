@@ -61,18 +61,6 @@ namespace MotionGestureProcessing
         }
 
         /// <summary>
-        /// This is used because edges is done in 32bpp and most cameras are only 24bpp
-        /// So i must convert the pixel format for easy comparison
-        /// </summary>
-        /// <param name="p_toInit">image to convert</param>
-        private void convert2PixelFormat(ref Image p_toInit)
-        {
-            Bitmap converted = new Bitmap(p_toInit);
-
-            p_toInit = converted;
-        }
-
-        /// <summary>
         /// Establishes a listening connection 
         /// </summary>
         protected override void setupListener()

@@ -228,9 +228,9 @@ namespace MotionGestureProcessing
                 {
                     offset = (((int)curPos[1] * p_data.Width) + (int)curPos[0]) * depth;
 
-                    p_buffer[offset] = p_color.B;
-                    p_buffer[offset + 1] = p_color.G;
-                    p_buffer[offset + 2] = p_color.R;
+                    p_buffer[offset] = p_buffer[offset - p_data.Stride] = p_buffer[offset + p_data.Stride] = p_color.B;
+                    p_buffer[offset + 1] = p_buffer[offset + 1 - p_data.Stride] = p_buffer[offset + 1 + p_data.Stride] = p_color.G;
+                    p_buffer[offset + 2] = p_buffer[offset + 2 - p_data.Stride] = p_buffer[offset + 2 + p_data.Stride] = p_color.R;
 
                     curPos[0] += deltaX;
                     curPos[1] += deltaY;

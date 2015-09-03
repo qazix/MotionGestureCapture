@@ -44,7 +44,6 @@ namespace MotionGestureProcessing
         /// <param name="p_imgData"></param>
         protected override async void doWork(object p_imgData)
         {
-
             byte[] buffer;
             BitmapData data = BitmapManip.lockBitmap(out buffer, ((ImageData)p_imgData).Image);
             ((ImageData)p_imgData).DataPoints = ImageProcess.getDataPoints(ref data, ref buffer);

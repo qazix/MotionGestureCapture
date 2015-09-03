@@ -147,17 +147,14 @@ namespace MotionGestureProcessing
                 stop();
                 IsInitialized = false;
             }
-            else
-            {
-                m_preProc.initialize();
-                m_PCA.initialize();
-                m_gesture.initialize();
-                m_drawing.initialize();
-            }
 
             //ToIsolationImage = new ImageData(true, await m_camCapture.grabImage());
             ImageData id = new ImageData(true, await m_camCapture.grabImage());
             m_handIso.initialize(id);
+            m_preProc.initialize();
+            m_PCA.initialize();
+            m_gesture.initialize();
+            m_drawing.initialize();
 
             IsInitialized = true;
             if (toRun)

@@ -11,6 +11,8 @@ namespace MotionGestureProcessing
 {
     class Preprocessing : Process
     {
+        enum DIRECTION { INVALID = -1, LEFT, RIGHT, TOP, BOTTOM };
+        DIRECTION m_direction;
         private Processing.ImageReadyHandler m_preprocImageHandler;
 
         public Preprocessing()
@@ -50,7 +52,9 @@ namespace MotionGestureProcessing
 
             if (((ImageData)p_imgData).DataPoints.Count > 0)
             {
+                m_direction = DIRECTION.INVALID;
                 ((ImageData)p_imgData).Filter = cropDataSet(ref data, ref buffer);
+                findFingers(ref data, ref buffer);
                 ((ImageData)p_imgData).Contour = ImageProcess.getContour(ref data, ref buffer);
                 ((ImageData)p_imgData).ConvexHull = ImageProcess.getConvexHull(((ImageData)p_imgData).Contour);
             }
@@ -90,40 +94,41 @@ namespace MotionGestureProcessing
             #endregion
 
             int max = 0;
-            int dir = -1;
+            DIRECTION dir = DIRECTION.INVALID;
             //find max histogram value this represent the wrist
             for (int i = 0; i < extremeHistogram.Length; ++i)
             {
                 if (extremeHistogram[i] > max)
                 {
                     max = extremeHistogram[i];
-                    dir = i;
+                    dir = (DIRECTION)i;
                 }
             }
 
+            m_direction = dir;
             int wristIndex;
             //based on the direction do some stuff
             switch (dir)
             {
-                case 0: //left
+                case DIRECTION.LEFT: //left
                     wristIndex = findWrist(left, ref xHistogram);
                     if (wristIndex == -1)
                         return new Rectangle(0, 0, p_data.Width, p_data.Height);
                     removeWrist(0, wristIndex, 0, p_data.Height, ref p_data, ref p_buffer);
                     break;
-                case 1: //right
+                case DIRECTION.RIGHT: //right
                     wristIndex = findWrist(right, ref xHistogram);
                     if (wristIndex == -1)
                         return new Rectangle(0, 0, p_data.Width, p_data.Height);
                     removeWrist(wristIndex, p_data.Width, 0, p_data.Height, ref p_data, ref p_buffer);
                     break;
-                case 2: //top
+                case DIRECTION.TOP: //top
                     wristIndex = findWrist(top, ref yHistogram);
                     if (wristIndex == -1)
                         return new Rectangle(0, 0, p_data.Width, p_data.Height);
                     removeWrist(0, p_data.Width, 0, wristIndex, ref p_data, ref p_buffer);
                     break;
-                case 3: //bottom
+                case DIRECTION.BOTTOM: //bottom
                     wristIndex = findWrist(bottom, ref yHistogram);
                     if (wristIndex == -1)
                         return new Rectangle(0, 0, p_data.Width, p_data.Height);
@@ -248,6 +253,167 @@ namespace MotionGestureProcessing
                         p_buffer[offset] = p_buffer[offset + 1] = p_buffer[offset + 2] = 0;
                 }
             }
+        }
+
+        /// <summary>
+        /// This method implements J. Raheja, K. Das, A. Chaudhary's fast finger algorithm
+        /// </summary>
+        /// <seealso cref="http://arxiv.org/ftp/arxiv/papers/1212/1212.0134.pdf"/>
+        /// <param name="p_data"></param>
+        /// <param name="p_buffer"></param>
+        /// <returns></returns>
+        private List<Point> findFingers(ref BitmapData p_data, ref byte[] p_buffer)
+        {
+            if (m_direction == DIRECTION.INVALID)
+                throw new Exception("Invalid direction");
+
+            //we don't want to alter the original image
+            byte[] buffer = new byte[p_buffer.Length];
+            Buffer.BlockCopy(p_buffer, 0, buffer, 0, p_buffer.Length);
+
+            int[] xHistogram, yHistogram;
+            project2Histogram(out xHistogram, out yHistogram, ref p_data, ref buffer);
+
+            switch (m_direction)
+            {
+                case DIRECTION.LEFT:
+                    modifyBufferForFinger(ref p_data, ref buffer, ref yHistogram, 0, true);
+                    break;
+                case DIRECTION.RIGHT:
+                    modifyBufferForFinger(ref p_data, ref buffer, ref yHistogram, p_data.Width - 1, true);
+                    break;
+                case DIRECTION.TOP:
+                    modifyBufferForFinger(ref p_data, ref buffer, ref xHistogram, 0, false);
+                    break;
+                case DIRECTION.BOTTOM:
+                    modifyBufferForFinger(ref p_data, ref buffer, ref xHistogram, p_data.Height - 1, false);
+                    break;                  
+            }
+            
+            Dictionary<int, List<Point>> fingerTips = ImageProcess.findBlobs(ref p_data, ref buffer);
+
+            //Clean up some noise
+            int threshold = fingerTips.Max(x => x.Value.Count) / 2;
+            foreach (KeyValuePair<int, List<Point>> item in fingerTips.Where(x => x.Value.Count < threshold).ToList())
+            {
+                fingerTips.Remove(item.Key);
+            }
+
+            
+            List<Point> fingerTipPoints = refineFingerTips(ref fingerTips);
+
+            
+            Image img = new Bitmap(p_data.Width, p_data.Height);
+            byte[] garbage;
+            BitmapData garbageData = BitmapManip.lockBitmap(out garbage, img);
+            Buffer.BlockCopy(buffer, 0, garbage, 0, buffer.Length);
+
+            ImageProcess.updateBuffer(fingerTipPoints, ref garbageData, ref garbage);
+
+            BitmapManip.unlockBitmap(ref garbage, ref garbageData, img);
+            img.Save("fingerTips.jpg");
+
+            return fingerTipPoints;
+        }
+         
+        /// <summary>
+        /// perfoms the modify image function described in the article
+        /// </summary>
+        /// <param name="p_data"></param>
+        /// <param name="p_buffer"></param>
+        /// <param name="p_histogram"></param>
+        /// <param name="p_start"></param>
+        private void modifyBufferForFinger(ref BitmapData p_data, ref byte[] p_buffer, ref int[] p_histogram, int p_start, bool p_rowFirst)
+        {
+            int offset, end, inc, x, y, currentCount, pixelCount;
+            inc = (p_start == 0 ? 1 : -1);
+
+            //Left and right iterate x then y
+            if (p_rowFirst)
+            {
+                end = p_data.Width - p_start - 1;
+                for (y = 0; y < p_data.Height; ++y)
+                {
+                    offset = ImageProcess.getOffset(p_start, y, p_data.Width, 4);
+                    currentCount = 0;
+                    
+                    if ((pixelCount = p_histogram[y]) != 0)
+                        for (x = p_start; x != end && currentCount < pixelCount; x += inc, offset += inc * 4)
+                        {
+                            if (p_buffer[offset] == 255)
+                            {
+                                ++currentCount;
+
+                                if ((int)Math.Round(currentCount * 255.0 / p_histogram[y]) == 255)
+                                    p_buffer[offset] = p_buffer[offset + 1] = p_buffer[offset + 2] = 255;
+                                else
+                                    p_buffer[offset] = p_buffer[offset + 1] = p_buffer[offset + 2] = 0;
+                            }
+                        }
+                }
+            }
+            else //Top and bottom iterate y then x
+            {
+                end = p_data.Height - p_start - 1;
+                for (x = 0; x < p_data.Width; ++x)
+                {
+                    offset = ImageProcess.getOffset(x, p_start, p_data.Width, 4);
+                    currentCount = 0;
+
+                    if ((pixelCount = p_histogram[x]) != 0)
+                        for (y = p_start; y != end && currentCount < pixelCount; y += inc, offset += inc * p_data.Stride)
+                        {
+                            if (p_buffer[offset] == 255)
+                            {
+                                ++currentCount;
+
+                                if ((int)Math.Round(currentCount * 255.0 / p_histogram[x]) == 255)
+                                    p_buffer[offset] = p_buffer[offset + 1] = p_buffer[offset + 2] = 255;
+                                else
+                                    p_buffer[offset] = p_buffer[offset + 1] = p_buffer[offset + 2] = 0;
+                            }
+                        }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Refines entire blobs to single points
+        /// </summary>
+        /// <param name="fingerTips"></param>
+        /// <returns></returns>
+        private List<Point> refineFingerTips(ref Dictionary<int, List<Point>> p_fingerTips)
+        {
+            //List<Point> Composite = new List<Point>();
+
+            List<Point> fingerTipPoints = new List<Point>();
+            foreach (List<Point> tip in p_fingerTips.Values)
+            {
+                //Composite.AddRange(tip);
+                switch(m_direction)
+                {
+                    case DIRECTION.LEFT:
+                        //find greatest x position
+                        fingerTipPoints.Add( tip.Aggregate((l, r) => (l.X > r.X ? l : r)) );
+                        break;
+                    case DIRECTION.RIGHT:
+                        //find least x position
+                        fingerTipPoints.Add(tip.Aggregate((l, r) => (l.X < r.X ? l : r)));
+                        break;
+                    case DIRECTION.TOP:
+                        //find greatest Y position
+                        fingerTipPoints.Add(tip.Aggregate((l, r) => (l.Y > r.Y ? l : r)));
+                        break;
+                    case DIRECTION.BOTTOM:
+                        //find least Y position
+                        fingerTipPoints.Add(tip.Aggregate((l, r) => (l.Y < r.Y ? l : r)));
+                        break;     
+                }
+            }
+
+
+            return fingerTipPoints;
+            //return Composite;
         }
     }
 }

@@ -48,16 +48,83 @@ namespace MotionGestureProcessing
 
                 List<Point> convexHull = ((ImageData)p_imgData).ConvexHull;
                 List<Point> contour = ((ImageData)p_imgData).Contour;
+                Point center = ((ImageData)p_imgData).Center;
+
                 double threshold = ((ImageData)p_imgData).Filter.Height * .25;
 
                 List<ConvexDefect> convexDefects;
                 ImageProcess.getConvexDefects(ref contour, ref convexHull, out convexDefects, threshold);
+
+                //orientClockwise(ref convexDefects, ref center);
 
                 ((ImageData)p_imgData).ConvexDefects = convexDefects;
             }
 
             //writeGesture(gesture);
             Processing.getInstance().ToDrawingImage = (ImageData)p_imgData;
+        }
+
+        private void orientClockwise(ref List<ConvexDefect> p_defects, ref Point p_center)
+        {
+            List<ConvexDefect> tempDefects = new List<ConvexDefect>();
+            ConvexDefect start, end, current, minDefect;
+            double sideA2, sideB2, sideC2, angleA, max, dist, min;
+            start = end = minDefect = null;
+            max = 0;
+            min = Int32.MaxValue;
+
+            //FInd the defects that represent the widest degree of variance.  This represent the pinky and thumb
+            foreach (ConvexDefect cdStart in p_defects)
+            {
+                foreach(ConvexDefect cdEnd in p_defects)
+                {
+                    if (!cdStart.Equals(cdEnd))
+                    {
+                        //This is explained in ImageProcess.calculateDefest
+                        sideA2 = (cdEnd.EndPoint.X - cdStart.StartPoint.X) * (cdEnd.EndPoint.X - cdStart.StartPoint.X) +
+                                 (cdEnd.EndPoint.Y - cdStart.StartPoint.Y) * (cdEnd.EndPoint.Y - cdStart.StartPoint.Y);
+                        sideB2 = (p_center.X - cdEnd.EndPoint.X) * (p_center.X - cdEnd.EndPoint.X) +
+                                 (p_center.Y - cdEnd.EndPoint.Y) * (p_center.Y - cdEnd.EndPoint.Y);
+                        sideC2 = (cdStart.StartPoint.X - p_center.X) * (cdStart.StartPoint.X - p_center.X) +
+                                 (cdStart.StartPoint.Y - p_center.Y) * (cdStart.StartPoint.Y - p_center.Y);
+
+                        angleA = Math.Acos((sideB2 + sideC2 - sideA2) / (2 * Math.Sqrt(sideB2) * Math.Sqrt(sideC2)));
+
+                        if (angleA > max)
+                        {
+                            max = angleA;
+                            start = cdStart;
+                            end = cdEnd;
+                        }
+                    }
+                }
+            }
+
+            current = start;
+
+            //Connect the closest defects end to start
+            while (!current.Equals(end) && tempDefects.Count < p_defects.Count)
+            {
+                tempDefects.Add(current);
+                foreach (ConvexDefect cd in p_defects)
+                {
+                    if (!cd.Equals(current))
+                    {
+                        dist = (cd.StartPoint.X - current.EndPoint.X) * (cd.StartPoint.X - current.EndPoint.X) +
+                               (cd.StartPoint.Y - current.EndPoint.Y) * (cd.StartPoint.Y - current.EndPoint.Y);
+
+                        if (dist < min)
+                        {
+                            minDefect = cd;
+                        }
+                    }
+                }
+
+                current = minDefect;
+            }
+
+            tempDefects.Add(current);
+            p_defects = tempDefects;
         }        
 
         /// <summary>

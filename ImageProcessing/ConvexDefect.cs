@@ -19,5 +19,10 @@ namespace ImageProcessing
             StartPoint = p_start;
             EndPoint = p_end;
         }
+
+        public override bool Equals(object obj)
+        {
+            return StartPoint.Equals(((ConvexDefect)obj).StartPoint);
+        }
     }
 }

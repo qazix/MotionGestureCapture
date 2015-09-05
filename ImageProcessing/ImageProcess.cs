@@ -158,7 +158,7 @@ namespace ImageProcessing
                 defects.Add(calculateDefect(ref p_contour, ref currentContourPoint, p_convexHull[i - 1], p_convexHull[i]));
             }
 
-            defects.RemoveAll((x) => x.distance < threshold);
+            defects.RemoveAll((x) => x.DistanceToDeepestPoint < threshold);
 
             return defects;
         }
@@ -213,11 +213,11 @@ namespace ImageProcessing
             if (min < 2 * Math.PI / 3)
             {
                 Point midpoint = new Point((p_end.X + p_start.X) / 2, (p_end.Y + p_start.Y) / 2);
-                cd.distance = Math.Sqrt((cd.DeepestPoint.X - midpoint.X) * (cd.DeepestPoint.X - midpoint.X) +
-                                        (cd.DeepestPoint.Y - midpoint.Y) * (cd.DeepestPoint.Y - midpoint.Y));
+                cd.DistanceToDeepestPoint = Math.Sqrt((cd.DeepestPoint.X - midpoint.X) * (cd.DeepestPoint.X - midpoint.X) +
+                                                      (cd.DeepestPoint.Y - midpoint.Y) * (cd.DeepestPoint.Y - midpoint.Y));
             }
             else
-                cd.distance = 0.0;
+                cd.DistanceToDeepestPoint = 0.0;
             return cd;
         }
 

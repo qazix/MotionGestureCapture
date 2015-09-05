@@ -12,7 +12,14 @@ namespace ImageProcessing
         public Point StartPoint { get; set; }
         public Point EndPoint { get; set; }
         public Point DeepestPoint { get; set; }
-        public double distance { get; set; }
+        public double DistanceToDeepestPoint { get; set; }
+        
+        public double DistanceToEnd { //this performing math becuase it isn't used very often
+            get {
+               return Math.Sqrt((EndPoint.X - StartPoint.X) * (EndPoint.X - StartPoint.X) +
+                                (EndPoint.Y - StartPoint.Y) * (EndPoint.Y - StartPoint.Y));
+            }
+        }
 
         public ConvexDefect(Point p_start, Point p_end)
         {

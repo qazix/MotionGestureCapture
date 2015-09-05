@@ -53,13 +53,23 @@ namespace MotionGestureProcessing
             if (((ImageData)p_imgData).DataPoints.Count > 0)
             {
                 m_direction = DIRECTION.INVALID;
+
                 ((ImageData)p_imgData).Filter = cropDataSet(ref data, ref buffer);
                 ((ImageData)p_imgData).Contour = ImageProcess.getContour(ref data, ref buffer);
                 ((ImageData)p_imgData).ConvexHull = ImageProcess.getConvexHull(((ImageData)p_imgData).Contour);
+                
+                //defects
+                double defectThreshold;
+                if (m_direction == DIRECTION.LEFT || m_direction == DIRECTION.RIGHT)
+                    defectThreshold = ((ImageData)p_imgData).Filter.Width * .25;
+                else
+                    defectThreshold = ((ImageData)p_imgData).Filter.Height * .25;
                 ((ImageData)p_imgData).ConvexDefects = ImageProcess.getConvexDefects(((ImageData)p_imgData).Contour, ((ImageData)p_imgData).ConvexHull,
-                                                                                     ((ImageData)p_imgData).Filter.Height * .25);
-                Dictionary<int, List<Point>> fingerTips = findFingers(ref data, ref buffer);
+                                                                                     defectThreshold);
+                ((ImageData)p_imgData).ConvexDefects = organizeDefects(((ImageData)p_imgData).ConvexDefects);
 
+                //fingers
+                Dictionary<int, List<Point>> fingerTips = findFingers(ref data, ref buffer);
                 ((ImageData)p_imgData).FingerTips = refineFingerTips(ref fingerTips, ((ImageData)p_imgData).ConvexDefects);
             }
 
@@ -67,6 +77,7 @@ namespace MotionGestureProcessing
 
             Processing.getInstance().ToPCAImage = (ImageData)p_imgData;
         }
+
 
         /// <summary>
         /// first determine the wrist end and then crop around just the hand
@@ -257,6 +268,75 @@ namespace MotionGestureProcessing
                         p_buffer[offset] = p_buffer[offset + 1] = p_buffer[offset + 2] = 0;
                 }
             }
+        }
+
+        /// <summary>
+        /// Organizes the defects to be clockwise and adjust start and end point to meet
+        /// </summary>
+        /// <param name="p_defects"></param>
+        /// <returns></returns>
+        private List<ConvexDefect> organizeDefects(List<ConvexDefect> p_defects)
+        {
+            List<ConvexDefect> orderedDefects = new List<ConvexDefect>();
+
+            if (p_defects.Count > 1)
+            {
+                int minIndex = -1;
+                double dist, min;
+                Point mergePoint = new Point();
+
+
+                //Merge points of end and starts that are close together
+                for (int i = 0; i < p_defects.Count; ++i)
+                {
+                    min = int.MaxValue;
+                    for (int j = (i + 1) % p_defects.Count; j != i; j = (j + 1) % p_defects.Count)
+                    {
+                        dist = (p_defects[i].EndPoint.X - p_defects[j].StartPoint.X) * (p_defects[i].EndPoint.X - p_defects[j].StartPoint.X) +
+                               (p_defects[i].EndPoint.Y - p_defects[j].StartPoint.Y) * (p_defects[i].EndPoint.Y - p_defects[j].StartPoint.Y);
+
+                        if (dist < min)
+                        {
+                            min = dist;
+                            minIndex = j;
+                        }
+                    }
+
+                    dist = Math.Sqrt((p_defects[i].EndPoint.X - p_defects[minIndex].StartPoint.X) * (p_defects[i].EndPoint.X - p_defects[minIndex].StartPoint.X) +
+                                     (p_defects[i].EndPoint.Y - p_defects[minIndex].StartPoint.Y) * (p_defects[i].EndPoint.Y - p_defects[minIndex].EndPoint.Y));
+
+                    //If the distance between the two defects is less than distance within a defect then merge them
+                    if (dist < p_defects[i].DistanceToEnd)
+                    {
+                        mergePoint.X = (p_defects[i].EndPoint.X + p_defects[minIndex].StartPoint.X) / 2;
+                        mergePoint.Y = (p_defects[i].EndPoint.Y + p_defects[minIndex].StartPoint.Y) / 2;
+
+                        p_defects[i].EndPoint = new Point(mergePoint.X, mergePoint.Y);
+                        p_defects[minIndex].StartPoint = new Point(mergePoint.X, mergePoint.Y);
+                    }
+                }
+
+                //find the startpoint that is hanging
+                foreach (ConvexDefect cd in p_defects)
+                {
+                    if (!p_defects.Select(x => x.EndPoint).ToList().Contains(cd.StartPoint))
+                    {
+                        orderedDefects.Add(cd);
+                        break;
+                    }
+                }
+
+                //Add the defects that have endPoints connected to startPoints in the ordered list
+                while (orderedDefects.Count != p_defects.Count)
+                {
+                    orderedDefects.Add(p_defects.Where(dp => dp.StartPoint.Equals(orderedDefects.Last().EndPoint)).ToList().First());
+                }
+
+            }
+            else
+                orderedDefects.AddRange(p_defects);
+
+            return orderedDefects;
         }
 
         /// <summary>

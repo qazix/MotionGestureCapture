@@ -52,6 +52,8 @@ namespace MotionGestureProcessing
                 drawDefects(ref data, ref buffer, convexDefects, Color.Orange);
 
                 BitmapManip.unlockBitmap(ref buffer, ref data, ((ImageData)p_imgData).Image);
+
+                ((ImageData)p_imgData).Image.Save("Final.jpg");
             }
 
             Processing.getInstance().ToReturnImage = (ImageData)p_imgData;

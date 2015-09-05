@@ -20,6 +20,7 @@ namespace MotionGestureProcessing
         public List<Point> ConvexHull { get; set; }
         public List<ConvexDefect> ConvexDefects { get; set; }
         public List<Point> Contour { get; set; }
+        public List<Point> FingerTips { get; set; }
 
         public ImageData(bool p_isInit, Image p_image)
         {

@@ -149,17 +149,18 @@ namespace ImageProcessing
         /// <param name="p_interiorPoints"></param>
         /// <param name="p_size"></param>
         /// <returns></returns>
-        public static void getConvexDefects(ref List<Point> p_contour, ref List<Point> p_convexHull,  
-                                                   out List<ConvexDefect> p_defects, double threshold)
+        public static List<ConvexDefect> getConvexDefects(List<Point> p_contour, List<Point> p_convexHull, double threshold)
         {
-            p_defects = new List<ConvexDefect>();
+            List<ConvexDefect> defects = new List<ConvexDefect>();
             int currentContourPoint = 0;
             for (int i = 1; i < p_convexHull.Count; ++i)
             {
-                p_defects.Add(calculateDefect(ref p_contour, ref currentContourPoint, p_convexHull[i - 1], p_convexHull[i]));
+                defects.Add(calculateDefect(ref p_contour, ref currentContourPoint, p_convexHull[i - 1], p_convexHull[i]));
             }
 
-            p_defects.RemoveAll((x) => x.distance < threshold);
+            defects.RemoveAll((x) => x.distance < threshold);
+
+            return defects;
         }
 
         /// <summary>

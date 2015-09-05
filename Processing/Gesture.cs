@@ -49,11 +49,14 @@ namespace MotionGestureProcessing
                 List<Point> convexHull = ((ImageData)p_imgData).ConvexHull;
                 List<Point> contour = ((ImageData)p_imgData).Contour;
                 Point center = ((ImageData)p_imgData).Center;
+                List<ConvexDefect> convexDefects = ((ImageData)p_imgData).ConvexDefects;
+                List<Point> fingerTips = ((ImageData)p_imgData).FingerTips;
 
-                double threshold = ((ImageData)p_imgData).Filter.Height * .25;
+              
 
-                List<ConvexDefect> convexDefects;
-                ImageProcess.getConvexDefects(ref contour, ref convexHull, out convexDefects, threshold);
+
+
+
 
                 //orientClockwise(ref convexDefects, ref center);
 

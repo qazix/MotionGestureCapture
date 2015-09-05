@@ -272,32 +272,33 @@ namespace MotionGestureProcessing
                 throw new Exception("Invalid direction");
 
             //we don't want to alter the original image
-            byte[] buffer = new byte[p_buffer.Length];
-            Buffer.BlockCopy(p_buffer, 0, buffer, 0, p_buffer.Length);
+            byte[] fingerBuffer = new byte[p_buffer.Length];
+            Buffer.BlockCopy(p_buffer, 0, fingerBuffer, 0, p_buffer.Length);
 
             int[] xHistogram, yHistogram;
-            project2Histogram(out xHistogram, out yHistogram, ref p_data, ref buffer);
+            project2Histogram(out xHistogram, out yHistogram, ref p_data, ref fingerBuffer);
 
+            //Populate fingerBuffer
             switch (m_direction)
             {
                 case DIRECTION.LEFT:
-                    modifyBufferForFinger(ref p_data, ref buffer, ref yHistogram, 0, true);
+                    modifyBufferForFinger(ref p_data, ref fingerBuffer, ref yHistogram, 0, true);
                     break;
                 case DIRECTION.RIGHT:
-                    modifyBufferForFinger(ref p_data, ref buffer, ref yHistogram, p_data.Width - 1, true);
+                    modifyBufferForFinger(ref p_data, ref fingerBuffer, ref yHistogram, p_data.Width - 1, true);
                     break;
                 case DIRECTION.TOP:
-                    modifyBufferForFinger(ref p_data, ref buffer, ref xHistogram, 0, false);
+                    modifyBufferForFinger(ref p_data, ref fingerBuffer, ref xHistogram, 0, false);
                     break;
                 case DIRECTION.BOTTOM:
-                    modifyBufferForFinger(ref p_data, ref buffer, ref xHistogram, p_data.Height - 1, false);
+                    modifyBufferForFinger(ref p_data, ref fingerBuffer, ref xHistogram, p_data.Height - 1, false);
                     break;                  
             }
             
-            Dictionary<int, List<Point>> fingerTips = ImageProcess.findBlobs(ref p_data, ref buffer);
+            Dictionary<int, List<Point>> fingerTips = ImageProcess.findBlobs(ref p_data, ref fingerBuffer);
 
             //Clean up some noise
-            int threshold = fingerTips.Max(x => x.Value.Count) / 2;
+            int threshold = fingerTips.Max(x => x.Value.Count) / 4;
             List<KeyValuePair<int, List<Point>>> kvps =  fingerTips.Where(x => x.Value.Count < threshold).ToList();
             if (fingerTips.Count - kvps.Count >= 5)
                 foreach (KeyValuePair<int, List<Point>> item in kvps)
@@ -315,7 +316,7 @@ namespace MotionGestureProcessing
             Image img = new Bitmap(p_data.Width, p_data.Height);
             byte[] garbage;
             BitmapData garbageData = BitmapManip.lockBitmap(out garbage, img);
-            Buffer.BlockCopy(buffer, 0, garbage, 0, buffer.Length);
+            Buffer.BlockCopy(fingerBuffer, 0, garbage, 0, fingerBuffer.Length);
 
             ImageProcess.updateBuffer(fingerTipPoints, ref garbageData, ref garbage);
 

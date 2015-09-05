@@ -186,7 +186,7 @@ namespace ImageProcessing
             double sideA2 = (p_end.X - p_start.X) * (p_end.X - p_start.X) +
                             (p_end.Y - p_start.Y) * (p_end.Y - p_start.Y);
             double sideB2, sideC2, min, angleA;
-            min = Math.PI;
+            min =  Math.PI;
 
             endIndex = p_index - 1;
             do
@@ -209,7 +209,7 @@ namespace ImageProcessing
             while (!p_contour[p_index].Equals(p_end) && p_index != endIndex);
 
             //calculate distance from middle of convex hull
-            if (min != Math.PI)
+            if (min < 2 * Math.PI / 3)
             {
                 Point midpoint = new Point((p_end.X + p_start.X) / 2, (p_end.Y + p_start.Y) / 2);
                 cd.distance = Math.Sqrt((cd.DeepestPoint.X - midpoint.X) * (cd.DeepestPoint.X - midpoint.X) +

@@ -326,10 +326,23 @@ namespace MotionGestureProcessing
                     }
                 }
 
+                if (orderedDefects.Count == 0)
+                    orderedDefects.Add(p_defects[0]);
+
                 //Add the defects that have endPoints connected to startPoints in the ordered list
                 while (orderedDefects.Count != p_defects.Count)
                 {
-                    orderedDefects.Add(p_defects.Where(dp => dp.StartPoint.Equals(orderedDefects.Last().EndPoint)).ToList().First());
+                    List<ConvexDefect> candidates = p_defects.Where(x => x.StartPoint.Equals(orderedDefects.Last().EndPoint)).ToList();
+                    if (candidates.Count == 1)
+                        orderedDefects.Add(candidates.First());
+                    else
+                    {
+                        int next;
+                        for (next = 0; next < p_defects.Count && !p_defects[next].Equals(orderedDefects.Last()); ++next)
+                            ;
+
+                        orderedDefects.Add(p_defects[(next + 1) % p_defects.Count]);
+                    }
                 }
 
             }

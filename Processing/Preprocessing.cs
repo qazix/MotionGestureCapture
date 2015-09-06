@@ -61,9 +61,9 @@ namespace MotionGestureProcessing
                 //defects
                 double defectThreshold;
                 if (m_direction == DIRECTION.LEFT || m_direction == DIRECTION.RIGHT)
-                    defectThreshold = ((ImageData)p_imgData).Filter.Width * .25;
+                    defectThreshold = ((ImageData)p_imgData).Filter.Width * .2;
                 else
-                    defectThreshold = ((ImageData)p_imgData).Filter.Height * .25;
+                    defectThreshold = ((ImageData)p_imgData).Filter.Height * .2;
                 ((ImageData)p_imgData).ConvexDefects = ImageProcess.getConvexDefects(((ImageData)p_imgData).Contour, ((ImageData)p_imgData).ConvexHull,
                                                                                      defectThreshold);
                 ((ImageData)p_imgData).ConvexDefects = organizeDefects(((ImageData)p_imgData).ConvexDefects);
@@ -487,75 +487,134 @@ namespace MotionGestureProcessing
         /// <returns></returns>
         private List<Point> refineFingerTips(ref Dictionary<int, List<Point>> p_fingerTips, List<ConvexDefect> p_defects)
         {
-            //Sometimes i get fingertips in defects and this will remove those
-            if (p_fingerTips.Count > 5)
-            {
-                foreach(ConvexDefect cd in p_defects)
-                    foreach (KeyValuePair<int, List<Point>> tip in p_fingerTips.Where(x => x.Value.Contains(cd.DeepestPoint)).ToList())
-                    {
-                        p_fingerTips.Remove(tip.Key);
-                    }
-            }
-
-            //Sometimes a fingertip gets split into two parts select the one that is on a end point.
-            if (p_fingerTips.Count > 5)
-            {
-                
-            }
-
             double min, dist;
             Point minPoint, avgPoint;
             minPoint = new Point();
             List<Point> fingerTipPoints = new List<Point>();
-            foreach (List<Point> tip in p_fingerTips.Values)
+
+            #region Easy reduction
+            //the following will only work for cases where there are 4 defects
+            if (p_defects.Count == 4)
             {
-                foreach (ConvexDefect cd in p_defects)
+                foreach (List<Point> tip in p_fingerTips.Values)
                 {
-                    if (tip.Contains(cd.StartPoint))
-                    {
-                        fingerTipPoints.Add(new Point(cd.StartPoint.X, cd.StartPoint.Y));
-                        break;
-                    }
-                    else if (tip.Contains(cd.EndPoint))
-                    {
-                        fingerTipPoints.Add(new Point(cd.EndPoint.X, cd.EndPoint.Y));
-                        break;
-                    }
-                }
-
-                //If the fingertip doesn't contain an endpoint of a convex defect map it to the closest one
-                if (fingerTipPoints.Count == 0 || !tip.Contains(fingerTipPoints.Last()))
-                {
-                    //average all points to one
-                    avgPoint = tip.Aggregate((acc, cur) => new Point(acc.X + cur.X, acc.Y + cur.Y));
-                    avgPoint.X /= tip.Count;
-                    avgPoint.Y /= tip.Count;
-
-                    min = int.MaxValue;
+                    //If the fingertip is touching a convex defect start/end point add it in
                     foreach (ConvexDefect cd in p_defects)
                     {
-                        dist = (cd.StartPoint.X - avgPoint.X) * (cd.StartPoint.X - avgPoint.X) +
-                               (cd.StartPoint.Y - avgPoint.Y) * (cd.StartPoint.Y - avgPoint.Y);
-
-                        if (dist < min)
+                        if (tip.Contains(cd.StartPoint))
                         {
-                            min = dist;
-                            minPoint = cd.StartPoint;
+                            fingerTipPoints.Add(new Point(cd.StartPoint.X, cd.StartPoint.Y));
+                            break;
                         }
-
-                        dist = (cd.EndPoint.X - avgPoint.X) * (cd.EndPoint.X - avgPoint.X) +
-                               (cd.EndPoint.Y - avgPoint.Y) * (cd.EndPoint.Y - avgPoint.Y);
-
-                        if (dist < min)
+                        else if (tip.Contains(cd.EndPoint))
                         {
-                            min = dist;
-                            minPoint = cd.EndPoint;
+                            fingerTipPoints.Add(new Point(cd.EndPoint.X, cd.EndPoint.Y));
+                            break;
                         }
                     }
 
-                    fingerTipPoints.Add(new Point(minPoint.X, minPoint.Y));
+                    //If the fingertip doesn't contain an endpoint of a convex defect map it to the closest one
+                    if (fingerTipPoints.Count == 0 || !tip.Contains(fingerTipPoints.Last()))
+                    {
+                        //average all points to one
+                        avgPoint = tip.Aggregate((acc, cur) => new Point(acc.X + cur.X, acc.Y + cur.Y));
+                        avgPoint.X /= tip.Count;
+                        avgPoint.Y /= tip.Count;
+
+                        min = int.MaxValue;
+                        foreach (ConvexDefect cd in p_defects)
+                        {
+                            dist = (cd.StartPoint.X - avgPoint.X) * (cd.StartPoint.X - avgPoint.X) +
+                                    (cd.StartPoint.Y - avgPoint.Y) * (cd.StartPoint.Y - avgPoint.Y);
+
+                            if (dist < min)
+                            {
+                                min = dist;
+                                minPoint = cd.StartPoint;
+                            }
+
+                            dist = (cd.EndPoint.X - avgPoint.X) * (cd.EndPoint.X - avgPoint.X) +
+                                    (cd.EndPoint.Y - avgPoint.Y) * (cd.EndPoint.Y - avgPoint.Y);
+
+                            if (dist < min)
+                            {
+                                min = dist;
+                                minPoint = cd.EndPoint;
+                            }
+                        }
+
+                        fingerTipPoints.Add(new Point(minPoint.X, minPoint.Y));
+                    }
                 }
             }
+            #endregion
+            #region Hard Reduction
+            else
+            {
+                //Sometimes I get fingertips in defects and this will remove those
+                if (p_fingerTips.Count > 5)
+                {
+                    foreach (ConvexDefect cd in p_defects)
+                        foreach (KeyValuePair<int, List<Point>> tip in p_fingerTips.Where(x => x.Value.Contains(cd.DeepestPoint)).ToList())
+                        {
+                            p_fingerTips.Remove(tip.Key);
+                        }
+                }
+
+                //Sometimes a fingertip gets split into two parts select the one that is on a end point.
+                if (p_fingerTips.Count > 5)
+                {
+                    p_fingerTips = p_fingerTips.OrderBy(kvp => kvp.Value.Min(point => point.X)).ToDictionary(pair => pair.Key, pair => pair.Value);
+
+                    List<Rectangle> proximalBoxes = new List<Rectangle>();
+                    Rectangle box;
+                    int minX, maxX, minY, maxY;
+                    
+                    //create boxes
+                    foreach (KeyValuePair<int, List<Point>> tip in p_fingerTips)
+                    {
+                        maxX = maxY = 0;
+                        minX = minY = int.MaxValue;
+                        foreach (Point p in tip.Value)
+                        {
+                            minX = (minX < p.X ? minX : p.X);
+                            maxX = (maxX > p.X ? maxX : p.X);
+                            minY = (minY < p.Y ? minY : p.Y);
+                            maxY = (maxY > p.Y ? maxY : p.Y);
+                        }
+                        box = new Rectangle();
+                        box.Width = maxX - minX;
+                        box.Height = maxY - minY;
+                        proximalBoxes.Add(box);
+                    }
+
+                    if (proximalBoxes.Count != p_fingerTips.Count)
+                        throw new Exception("Rectangles not equal to boxes");
+
+                    //combine fingertip candidates that fall within eachother's boxes
+                    List<int> keys = p_fingerTips.Keys.ToList(); ;
+                    for (int i = 0; i < keys.Count - 1; ++i)
+                    {
+                        box = proximalBoxes[i];
+                        box.X = p_fingerTips[keys[i]].Max(x => x.X);
+                        box.Y = p_fingerTips[keys[i]].Min(y => y.Y) - box.Height;
+                        box.Height += p_fingerTips[keys[i]].Max(y => y.Y) - box.Y + box.Height;
+
+                        if (p_fingerTips[keys[i + 1]].Where(point => box.Contains(point)).ToList().Count > 0)
+                        {
+                            p_fingerTips[keys[i + 1]].AddRange(p_fingerTips[keys[i]]);
+                            p_fingerTips[keys[i]].Clear();
+                        }
+                    }
+
+                    //remove the ones that are now empty
+                    foreach (KeyValuePair<int, List<Point>> item in p_fingerTips.Where(kvp => kvp.Value.Count == 0).ToList())
+                        p_fingerTips.Remove(item.Key);
+                }
+
+                //TODO add points to fingerTipPoints
+            }
+            #endregion
 
             return fingerTipPoints.Distinct().ToList();
         }

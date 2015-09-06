@@ -159,6 +159,7 @@ namespace ImageProcessing
             }
 
             defects.RemoveAll((x) => x.DistanceToDeepestPoint < threshold);
+            defects.RemoveAll(x => x.DistanceToEnd > 4 * threshold);
 
             return defects;
         }

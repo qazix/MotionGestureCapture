@@ -145,21 +145,23 @@ namespace ImageProcessing
         /// Using snakes from each line of the hull towards the center to find
         ///  the convex defects 
         /// </summary>
-        /// <param name="p_convexHull">The hull around the datapoints</param>
-        /// <param name="p_interiorPoints"></param>
-        /// <param name="p_size"></param>
-        /// <returns></returns>
-        public static void getConvexDefects(ref List<Point> p_contour, ref List<Point> p_convexHull,  
-                                                   out List<ConvexDefect> p_defects, double threshold)
+        /// <param name="p_contour">Outline of the hand</param>
+        /// <param name="p_convexHull">Exterior points</param>
+        /// <param name="threshold">a pixel value</param>
+        /// <returns>all convex defects that are within 20 to 80% of the threshold given</returns>
+        public static List<ConvexDefect> getConvexDefects(List<Point> p_contour, List<Point> p_convexHull, double threshold)
         {
-            p_defects = new List<ConvexDefect>();
+            List<ConvexDefect> defects = new List<ConvexDefect>();
             int currentContourPoint = 0;
             for (int i = 1; i < p_convexHull.Count; ++i)
             {
-                p_defects.Add(calculateDefect(ref p_contour, ref currentContourPoint, p_convexHull[i - 1], p_convexHull[i]));
+                defects.Add(calculateDefect(ref p_contour, ref currentContourPoint, p_convexHull[i - 1], p_convexHull[i]));
             }
 
-            p_defects.RemoveAll((x) => x.distance < threshold);
+            defects.RemoveAll(x => x.DistanceToDeepestPoint < threshold);
+            defects.RemoveAll(x => x.DistanceToDeepestPoint > 4 * threshold);
+
+            return defects;
         }
 
         /// <summary>
@@ -212,11 +214,11 @@ namespace ImageProcessing
             if (min < 2 * Math.PI / 3)
             {
                 Point midpoint = new Point((p_end.X + p_start.X) / 2, (p_end.Y + p_start.Y) / 2);
-                cd.distance = Math.Sqrt((cd.DeepestPoint.X - midpoint.X) * (cd.DeepestPoint.X - midpoint.X) +
-                                        (cd.DeepestPoint.Y - midpoint.Y) * (cd.DeepestPoint.Y - midpoint.Y));
+                cd.DistanceToDeepestPoint = Math.Sqrt((cd.DeepestPoint.X - midpoint.X) * (cd.DeepestPoint.X - midpoint.X) +
+                                                      (cd.DeepestPoint.Y - midpoint.Y) * (cd.DeepestPoint.Y - midpoint.Y));
             }
             else
-                cd.distance = 0.0;
+                cd.DistanceToDeepestPoint = 0.0;
             return cd;
         }
 

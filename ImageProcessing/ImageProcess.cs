@@ -145,10 +145,10 @@ namespace ImageProcessing
         /// Using snakes from each line of the hull towards the center to find
         ///  the convex defects 
         /// </summary>
-        /// <param name="p_convexHull">The hull around the datapoints</param>
-        /// <param name="p_interiorPoints"></param>
-        /// <param name="p_size"></param>
-        /// <returns></returns>
+        /// <param name="p_contour">Outline of the hand</param>
+        /// <param name="p_convexHull">Exterior points</param>
+        /// <param name="threshold">a pixel value</param>
+        /// <returns>all convex defects that are within 20 to 80% of the threshold given</returns>
         public static List<ConvexDefect> getConvexDefects(List<Point> p_contour, List<Point> p_convexHull, double threshold)
         {
             List<ConvexDefect> defects = new List<ConvexDefect>();
@@ -158,8 +158,8 @@ namespace ImageProcessing
                 defects.Add(calculateDefect(ref p_contour, ref currentContourPoint, p_convexHull[i - 1], p_convexHull[i]));
             }
 
-            defects.RemoveAll((x) => x.DistanceToDeepestPoint < threshold);
-            defects.RemoveAll(x => x.DistanceToEnd > 4 * threshold);
+            defects.RemoveAll(x => x.DistanceToDeepestPoint < threshold);
+            defects.RemoveAll(x => x.DistanceToDeepestPoint > 4 * threshold);
 
             return defects;
         }

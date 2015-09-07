@@ -42,6 +42,7 @@ namespace MotionGestureProcessing
                 List<Point> convexHull = ((ImageData)p_imgData).ConvexHull;
                 List<Point> contour = ((ImageData)p_imgData).Contour;
                 List<ConvexDefect> convexDefects = ((ImageData)p_imgData).ConvexDefects;
+                List<Point> fingerTips = ((ImageData)p_imgData).FingerTips;
 
                 byte[] buffer;
                 BitmapData data = BitmapManip.lockBitmap(out buffer, ((ImageData)p_imgData).Image);
@@ -50,6 +51,7 @@ namespace MotionGestureProcessing
                 drawLines(ref data, ref buffer, convexHull, Color.Yellow);
                 drawLines(ref data, ref buffer, contour, Color.Blue);
                 drawDefects(ref data, ref buffer, convexDefects, Color.Orange);
+                drawFingers(ref data, ref buffer, fingerTips, 20, Color.Red);
 
                 BitmapManip.unlockBitmap(ref buffer, ref data, ((ImageData)p_imgData).Image);
 
@@ -181,6 +183,24 @@ namespace MotionGestureProcessing
             }
         }
 
+        /// <summary>
+        /// Draws boxes around the fingertip
+        /// </summary>
+        /// <param name="p_data"></param>
+        /// <param name="p_buffer"></param>
+        /// <param name="p_fingerTips"></param>
+        /// <param name="p_color"></param>
+        private void drawFingers(ref BitmapData p_data, ref byte[] p_buffer, List<Point> p_fingerTips, int p_size, Color p_color)
+        {
+            p_size = p_size / 2;
+            foreach (Point tip in p_fingerTips)
+            {
+                drawLine(ref p_data, ref p_buffer, new Point(tip.X, tip.Y - p_size), new Point(tip.X + p_size, tip.Y), p_color);
+                drawLine(ref p_data, ref p_buffer, new Point(tip.X + p_size, tip.Y), new Point(tip.X, tip.Y + p_size), p_color);
+                drawLine(ref p_data, ref p_buffer, new Point(tip.X, tip.Y + p_size), new Point(tip.X - p_size, tip.Y), p_color);
+                drawLine(ref p_data, ref p_buffer, new Point(tip.X - p_size, tip.Y), new Point(tip.X, tip.Y - p_size), p_color);
+            }
+        }
 
         /// <summary>
         /// Takes a list of points and connects the dots
@@ -222,14 +242,13 @@ namespace MotionGestureProcessing
             do
             {
                 if (curPos[0] > 0 && curPos[0] < p_data.Width &&
-                    curPos[1] > 0 && curPos[1] < p_data.Height)
+                    curPos[1] > 1 && curPos[1] < p_data.Height - 1)
                     valid = true;
                 else
                     valid = false;
                 if (valid)
                 {
                     offset = (((int)curPos[1] * p_data.Width) + (int)curPos[0]) * depth;
-
                     p_buffer[offset] = p_buffer[offset - p_data.Stride] = p_buffer[offset + p_data.Stride] = p_color.B;
                     p_buffer[offset + 1] = p_buffer[offset + 1 - p_data.Stride] = p_buffer[offset + 1 + p_data.Stride] = p_color.G;
                     p_buffer[offset + 2] = p_buffer[offset + 2 - p_data.Stride] = p_buffer[offset + 2 + p_data.Stride] = p_color.R;

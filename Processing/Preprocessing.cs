@@ -278,6 +278,10 @@ namespace MotionGestureProcessing
         private List<ConvexDefect> organizeDefects(List<ConvexDefect> p_defects)
         {
             List<ConvexDefect> orderedDefects = new List<ConvexDefect>();
+            while (p_defects.Count > 4)
+            {
+                p_defects.Remove(p_defects.Where(x => (int)x.Area == (int)p_defects.Max(d => d.Area)).ToList().First());
+            }
 
             if (p_defects.Count > 1)
             {
@@ -303,7 +307,7 @@ namespace MotionGestureProcessing
                     }
 
                     dist = Math.Sqrt((p_defects[i].EndPoint.X - p_defects[minIndex].StartPoint.X) * (p_defects[i].EndPoint.X - p_defects[minIndex].StartPoint.X) +
-                                     (p_defects[i].EndPoint.Y - p_defects[minIndex].StartPoint.Y) * (p_defects[i].EndPoint.Y - p_defects[minIndex].EndPoint.Y));
+                                     (p_defects[i].EndPoint.Y - p_defects[minIndex].StartPoint.Y) * (p_defects[i].EndPoint.Y - p_defects[minIndex].StartPoint.Y));
 
                     //If the distance between the two defects is less than distance within a defect then merge them
                     if (dist < p_defects[i].DistanceToEnd)
@@ -487,15 +491,15 @@ namespace MotionGestureProcessing
         /// <returns></returns>
         private List<Point> refineFingerTips(ref Dictionary<int, List<Point>> p_fingerTips, List<ConvexDefect> p_defects)
         {
-            double min, dist;
-            Point minPoint, avgPoint;
-            minPoint = new Point();
+            double min, max, dist;
+            Point  avgPoint;
             List<Point> fingerTipPoints = new List<Point>();
 
             #region Easy reduction
             //the following will only work for cases where there are 4 defects
             if (p_defects.Count == 4)
             {
+                Point minPoint = new Point();
                 foreach (List<Point> tip in p_fingerTips.Values)
                 {
                     //If the fingertip is touching a convex defect start/end point add it in
@@ -549,8 +553,14 @@ namespace MotionGestureProcessing
             }
             #endregion
             #region Hard Reduction
-            else
+            else if (p_defects.Count > 0 && p_defects.Count < 4)
             {
+                Dictionary<int, Point> reducedPoints = new Dictionary<int, Point>();
+                KeyValuePair<int, Point> minPoint, maxPoint;
+                minPoint = new KeyValuePair<int, Point>();
+                maxPoint = new KeyValuePair<int, Point>();
+                int index = 0;
+
                 //Sometimes I get fingertips in defects and this will remove those
                 if (p_fingerTips.Count > 5)
                 {
@@ -561,7 +571,7 @@ namespace MotionGestureProcessing
                         }
                 }
 
-                //Sometimes a fingertip gets split into two parts select the one that is on a end point.
+                //Sometimes a fingertip gets split into two parts This will merge them together
                 if (p_fingerTips.Count > 5)
                 {
                     p_fingerTips = p_fingerTips.OrderBy(kvp => kvp.Value.Min(point => point.X)).ToDictionary(pair => pair.Key, pair => pair.Value);
@@ -612,7 +622,77 @@ namespace MotionGestureProcessing
                         p_fingerTips.Remove(item.Key);
                 }
 
-                //TODO add points to fingerTipPoints
+                min = int.MaxValue;
+                foreach (List<Point> tip in p_fingerTips.Values)
+                {
+                    //average all points to one
+                    avgPoint = tip.Aggregate((acc, cur) => new Point(acc.X + cur.X, acc.Y + cur.Y));
+                    avgPoint.X /= tip.Count;
+                    avgPoint.Y /= tip.Count;
+
+                    dist = (p_defects[0].StartPoint.X - avgPoint.X) * (p_defects[0].StartPoint.X - avgPoint.X) +
+                           (p_defects[0].StartPoint.Y - avgPoint.Y) * (p_defects[0].StartPoint.Y - avgPoint.Y);
+
+                    if (dist < min)
+                    {
+                        min = dist;
+                        minPoint = new KeyValuePair<int, Point>(index, avgPoint);
+                    }
+
+                    reducedPoints.Add(index++, new Point(avgPoint.X, avgPoint.Y));
+                }
+
+                fingerTipPoints.Add(new Point(p_defects[0].StartPoint.X, p_defects[0].StartPoint.Y));
+                reducedPoints.Remove(minPoint.Key);
+
+                //add points to fingerTipPoints
+                foreach (ConvexDefect cd in p_defects)
+                {
+                    min = int.MaxValue;
+                    foreach (KeyValuePair<int, Point> tip in reducedPoints)
+                    {
+                        dist = (cd.EndPoint.X - tip.Value.X) * (cd.EndPoint.X - tip.Value.X) +
+                               (cd.EndPoint.Y - tip.Value.Y) * (cd.EndPoint.Y - tip.Value.Y);
+
+                        if (dist < min)
+                        {
+                            min = dist;
+                            minPoint = tip;
+                        }
+                    }
+
+                    fingerTipPoints.Add(new Point(cd.EndPoint.X, cd.EndPoint.Y));
+                    reducedPoints.Remove(minPoint.Key);
+                }
+                
+                //Check to make sure I'm only seeing 5 fingers
+                if (reducedPoints.Count > 4 - p_defects.Count)
+                {
+                    //determine which defect has the largest area
+                    ConvexDefect maxDefect = p_defects.Where(x => (int)x.Area == (int)p_defects.Max(d => d.Area)).ToList().First();
+                    
+                    do
+                    {
+                        max = 0.0;
+                        //remove points farthest from the defect with the largest area 
+                        foreach (KeyValuePair<int, Point> tip in reducedPoints)
+                        {
+                            dist = (maxDefect.DeepestPoint.X - tip.Value.X) * (maxDefect.DeepestPoint.X - tip.Value.X) +
+                                   (maxDefect.DeepestPoint.Y - tip.Value.Y) * (maxDefect.DeepestPoint.Y - tip.Value.Y);
+
+                            if (dist > max)
+                            {
+                                max = dist;
+                                maxPoint = tip;
+                            }
+                        }
+
+                        reducedPoints.Remove(maxPoint.Key);
+                    }
+                    while (reducedPoints.Count > 5 - p_defects.Count + 1);
+                }
+
+                fingerTipPoints.AddRange(reducedPoints.Values);
             }
             #endregion
 

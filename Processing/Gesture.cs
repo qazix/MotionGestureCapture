@@ -28,8 +28,6 @@ namespace MotionGestureProcessing
         {
             m_GesturesImageHandler = (obj) =>
             {
-                //Thread t = new Thread(new ParameterizedThreadStart(doWork));
-                //t.Start(obj);
                 doWork(obj);
             };
 
@@ -52,7 +50,8 @@ namespace MotionGestureProcessing
                 ((ImageData)p_imgData).Gesture = deriveGesture(ref convexDefects, ref fingerTips);
 
             }
-            
+            else
+                m_thumbPos = 0;
 
 
             //writeGesture(gesture);
@@ -74,7 +73,6 @@ namespace MotionGestureProcessing
             switch(p_convexDefects.Count)
             {
                 case 0:
-                    m_thumbPos = 0;
                     gesture = ImageData.Gestures.CLICKANDHOLD;
                     break;
                 case 1:

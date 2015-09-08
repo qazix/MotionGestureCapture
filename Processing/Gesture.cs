@@ -11,13 +11,13 @@ namespace MotionGestureProcessing
 {
     public class Gesture : Process
     {
-        enum Gestures { NoGesture, RightClick, LeftClick, ClickAndHold, DoubleClick };
+        private int m_thumbPos;
 
         //public delegate void gestureCaptured(Gestures g, Image i);
         private Processing.ImageReadyHandler m_GesturesImageHandler;
 
         public Gesture()
-        { }
+        { m_thumbPos = 0; }
 
         public void initialize()
         {
@@ -42,101 +42,118 @@ namespace MotionGestureProcessing
         /// <param name="p_imgData"></param>
         protected override async void doWork(Object p_imgData)
         {
-            if (((ImageData)p_imgData).ConvexHull != null)
+            if (((ImageData)p_imgData).ConvexDefects != null)
             {
-                Gestures gesture = Gestures.NoGesture;
+                MotionGestureProcessing.ImageData.Gestures gesture = ImageData.Gestures.INITIALIZING;
 
-                List<Point> convexHull = ((ImageData)p_imgData).ConvexHull;
-                List<Point> contour = ((ImageData)p_imgData).Contour;
-                Point center = ((ImageData)p_imgData).Center;
                 List<ConvexDefect> convexDefects = ((ImageData)p_imgData).ConvexDefects;
                 List<Point> fingerTips = ((ImageData)p_imgData).FingerTips;
 
-              
+                gesture = deriveGesture(ref convexDefects, ref fingerTips);
 
-
-
-
-
-                //orientClockwise(ref convexDefects, ref center);
-
-                ((ImageData)p_imgData).ConvexDefects = convexDefects;
             }
+            
+
 
             //writeGesture(gesture);
             Processing.getInstance().ToDrawingImage = (ImageData)p_imgData;
         }
 
-        private void orientClockwise(ref List<ConvexDefect> p_defects, ref Point p_center)
+        /// <summary>
+        /// Runs through some defaults for determining gesture
+        /// </summary>
+        /// <param name="p_convexDefects"></param>
+        /// <param name="p_fingerTips"></param>
+        /// <returns>Gesture represented</returns>
+        private MotionGestureProcessing.ImageData.Gestures deriveGesture(ref List<ConvexDefect> p_convexDefects, ref List<Point> p_fingerTips)
         {
-            List<ConvexDefect> tempDefects = new List<ConvexDefect>();
-            ConvexDefect start, end, current, minDefect;
-            double sideA2, sideB2, sideC2, angleA, max, dist, min;
-            start = end = minDefect = null;
-            max = 0;
-            min = Int32.MaxValue;
+            int max;
+            ConvexDefect maxDefect;
+            MotionGestureProcessing.ImageData.Gestures gesture = ImageData.Gestures.INITIALIZING;
 
-            //FInd the defects that represent the widest degree of variance.  This represent the pinky and thumb
-            foreach (ConvexDefect cdStart in p_defects)
+            switch(p_convexDefects.Count)
             {
-                foreach(ConvexDefect cdEnd in p_defects)
-                {
-                    if (!cdStart.Equals(cdEnd))
+                case 0:
+                    m_thumbPos = 0;
+                    gesture = ImageData.Gestures.CLICKANDHOLD;
+                    break;
+                case 1:
+                    gesture = ImageData.Gestures.CLICKANDHOLD;
+                    break;
+                case 2:
+                    gesture = ImageData.Gestures.DOUBLECLICK;
+                    break;
+                case 3:
+                    if (m_thumbPos != 0)
+                        gesture = parse3Defect(ref p_convexDefects, ref p_fingerTips);
+                    break;
+                case 4: 
+                    if (p_fingerTips.Count == 5 && m_thumbPos == 0)
                     {
-                        //This is explained in ImageProcess.calculateDefest
-                        sideA2 = (cdEnd.EndPoint.X - cdStart.StartPoint.X) * (cdEnd.EndPoint.X - cdStart.StartPoint.X) +
-                                 (cdEnd.EndPoint.Y - cdStart.StartPoint.Y) * (cdEnd.EndPoint.Y - cdStart.StartPoint.Y);
-                        sideB2 = (p_center.X - cdEnd.EndPoint.X) * (p_center.X - cdEnd.EndPoint.X) +
-                                 (p_center.Y - cdEnd.EndPoint.Y) * (p_center.Y - cdEnd.EndPoint.Y);
-                        sideC2 = (cdStart.StartPoint.X - p_center.X) * (cdStart.StartPoint.X - p_center.X) +
-                                 (cdStart.StartPoint.Y - p_center.Y) * (cdStart.StartPoint.Y - p_center.Y);
-
-                        angleA = Math.Acos((sideB2 + sideC2 - sideA2) / (2 * Math.Sqrt(sideB2) * Math.Sqrt(sideC2)));
-
-                        if (angleA > max)
-                        {
-                            max = angleA;
-                            start = cdStart;
-                            end = cdEnd;
-                        }
+                        max = (int)p_convexDefects.Max(x => x.Area);
+                        maxDefect = p_convexDefects.Where(cd => (int)cd.Area == max).ToList().First();
+                        if (maxDefect.Equals(p_convexDefects[0]))
+                            m_thumbPos = -1;
+                        else
+                            m_thumbPos = 1;
                     }
-                }
+                    gesture = ImageData.Gestures.MOVE;
+                    break;
+                default:
+                    throw new Exception("more than 4 defects");
             }
 
-            current = start;
+            if (m_thumbPos == 0)
+                gesture = ImageData.Gestures.INITIALIZING;
 
-            //Connect the closest defects end to start
-            while (!current.Equals(end) && tempDefects.Count < p_defects.Count)
-            {
-                tempDefects.Add(current);
-                foreach (ConvexDefect cd in p_defects)
-                {
-                    if (!cd.Equals(current))
-                    {
-                        dist = (cd.StartPoint.X - current.EndPoint.X) * (cd.StartPoint.X - current.EndPoint.X) +
-                               (cd.StartPoint.Y - current.EndPoint.Y) * (cd.StartPoint.Y - current.EndPoint.Y);
-
-                        if (dist < min)
-                        {
-                            minDefect = cd;
-                        }
-                    }
-                }
-
-                current = minDefect;
-            }
-
-            tempDefects.Add(current);
-            p_defects = tempDefects;
-        }        
+            return gesture;
+        }
 
         /// <summary>
-        /// 
+        /// parses out the more complicated portion entering this means a few things we have a thumbe position
         /// </summary>
-        /// <param name="p_gesture"></param>
-        private void writeGesture(Gestures p_gesture)
+        /// <param name="p_convexDefects"></param>
+        /// <param name="p_fingerTips"></param>
+        /// <returns></returns>
+        private MotionGestureProcessing.ImageData.Gestures parse3Defect(ref List<ConvexDefect> p_convexDefects, ref List<Point> p_fingerTips)
         {
-            throw new NotImplementedException();
+            int containingIndex = -2; //-2 becuase i do an increment at the end and i still want negative to signify error
+            MotionGestureProcessing.ImageData.Gestures gesture;
+
+            //find out which defect contains another point
+            for (int i = 0; i < p_convexDefects.Count && containingIndex < 0; ++i)
+            {
+                foreach (Point p in p_fingerTips)
+                {
+                    if (!p.Equals(p_convexDefects[i].StartPoint) && !p.Equals(p_convexDefects[i].EndPoint))
+                        if (p_convexDefects[i].contains(p))
+                        {
+                            containingIndex = i;
+                            break;
+                        }
+                }
+            }
+
+            if (m_thumbPos == -1)
+                containingIndex = (containingIndex + 1) % 3;
+
+            switch (containingIndex)
+            {
+                case 0:
+                    gesture = ImageData.Gestures.DOUBLECLICK;
+                    break;
+                case 1:
+                    gesture = ImageData.Gestures.LEFTCLICK;
+                    break;
+                case 2:
+                    gesture = ImageData.Gestures.RIGHTCLICK;
+                    break;
+                default:
+                    gesture = ImageData.Gestures.MOVE;
+                    break;
+            }
+
+            return gesture;
         }
     }
 }

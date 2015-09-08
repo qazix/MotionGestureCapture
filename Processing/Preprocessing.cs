@@ -671,7 +671,10 @@ namespace MotionGestureProcessing
                     //determine which defect has the largest area
                     ConvexDefect maxDefect = p_defects.Where(x => (int)x.Area == (int)p_defects.Max(d => d.Area)).ToList().First();
                     
-                    do
+                    //first remove all points that aren't within a defect
+                    reducedPoints = reducedPoints.Where(x => maxDefect.contains(x.Value)).ToDictionary(pair => pair.Key, pair => pair.Value);
+
+                    while (reducedPoints.Count > 4 - p_defects.Count)
                     {
                         max = 0.0;
                         //remove points farthest from the defect with the largest area 
@@ -689,7 +692,6 @@ namespace MotionGestureProcessing
 
                         reducedPoints.Remove(maxPoint.Key);
                     }
-                    while (reducedPoints.Count > 5 - p_defects.Count + 1);
                 }
 
                 fingerTipPoints.AddRange(reducedPoints.Values);

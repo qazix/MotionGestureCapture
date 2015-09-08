@@ -278,9 +278,10 @@ namespace MotionGestureProcessing
         private List<ConvexDefect> organizeDefects(List<ConvexDefect> p_defects)
         {
             List<ConvexDefect> orderedDefects = new List<ConvexDefect>();
+
             while (p_defects.Count > 4)
             {
-                p_defects.Remove(p_defects.Where(x => (int)x.Area == (int)p_defects.Max(d => d.Area)).ToList().First());
+                p_defects.Remove(p_defects.Single(x => (int)x.Area == (int)p_defects.Min(dp => dp.Area)));
             }
 
             if (p_defects.Count > 1)

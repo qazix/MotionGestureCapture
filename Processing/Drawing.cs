@@ -43,6 +43,7 @@ namespace MotionGestureProcessing
                 List<Point> contour = ((ImageData)p_imgData).Contour;
                 List<ConvexDefect> convexDefects = ((ImageData)p_imgData).ConvexDefects;
                 List<Point> fingerTips = ((ImageData)p_imgData).FingerTips;
+                MotionGestureProcessing.ImageData.Gestures gesture = ((ImageData)p_imgData).Gesture;
 
                 byte[] buffer;
                 BitmapData data = BitmapManip.lockBitmap(out buffer, ((ImageData)p_imgData).Image);
@@ -52,6 +53,7 @@ namespace MotionGestureProcessing
                 drawLines(ref data, ref buffer, contour, Color.Blue);
                 drawDefects(ref data, ref buffer, convexDefects, Color.Orange);
                 drawFingers(ref data, ref buffer, fingerTips, 20, Color.Red);
+                drawGesture(ref data, ref buffer, gesture);
 
                 BitmapManip.unlockBitmap(ref buffer, ref data, ((ImageData)p_imgData).Image);
 
@@ -199,6 +201,62 @@ namespace MotionGestureProcessing
                 drawLine(ref p_data, ref p_buffer, new Point(tip.X + p_size, tip.Y), new Point(tip.X, tip.Y + p_size), p_color);
                 drawLine(ref p_data, ref p_buffer, new Point(tip.X, tip.Y + p_size), new Point(tip.X - p_size, tip.Y), p_color);
                 drawLine(ref p_data, ref p_buffer, new Point(tip.X - p_size, tip.Y), new Point(tip.X, tip.Y - p_size), p_color);
+            }
+        }
+
+        /// <summary>
+        /// loads an image for the gesture and puts it in top right corner
+        /// </summary>
+        /// <param name="p_gesture"></param>
+        private void drawGesture(ref BitmapData p_data, ref byte[] p_buffer, ImageData.Gestures p_gesture)
+        {
+            string resourceName = "";
+            byte[] buffer;
+            BitmapData data;
+            int offset, sourceOffset;
+
+            switch(p_gesture)
+            {
+                case ImageData.Gestures.INITIALIZING:
+                    resourceName = "initialize";
+                    break;
+                case ImageData.Gestures.MOVE:
+                    resourceName = "move";
+                    break;
+                case ImageData.Gestures.RIGHTCLICK:
+                    resourceName = "mouse_right_click";
+                    break;
+                case ImageData.Gestures.LEFTCLICK:
+                    resourceName = "mouse_left_click_128";
+                    break;
+                case ImageData.Gestures.DOUBLECLICK:
+                    resourceName = "double_click";
+                    break;
+                case ImageData.Gestures.CLICKANDHOLD:
+                    resourceName = "click_and_hold";
+                    break;
+            }
+
+
+            Image im = (Bitmap)MotionGestureProcessing.Properties.Resources.ResourceManager.GetObject(resourceName);
+            {
+                convert2PixelFormat(ref im);
+                data = BitmapManip.lockBitmap(out buffer, im);
+                BitmapManip.unlockBitmap(ref buffer, ref data, im);
+            }
+            im.Dispose();
+
+            offset = sourceOffset = 0;
+            for (int y = 0; y < data.Height; ++y)
+            {
+                sourceOffset = ImageProcess.getOffset(0, y, p_data.Width, 4);
+                for (int x = 0; x < data.Width; ++x, sourceOffset += 4, offset += 4)
+                {
+                    p_buffer[sourceOffset] = buffer[offset];
+                    p_buffer[sourceOffset + 1] = buffer[offset + 1];
+                    p_buffer[sourceOffset + 2] = buffer[offset + 2];
+                    p_buffer[sourceOffset + 3] = buffer[offset + 3];
+                }
             }
         }
 

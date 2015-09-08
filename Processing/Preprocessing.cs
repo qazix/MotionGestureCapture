@@ -405,6 +405,7 @@ namespace MotionGestureProcessing
             else
                 fingerTips = fingerTips.OrderByDescending(x => x.Value.Count).Take(5).ToDictionary(pair => pair.Key, pair => pair.Value);
 
+            /*
             List<Point> fingerTipPoints = new List<Point>();
             foreach (KeyValuePair<int, List<Point>> tip in fingerTips)
                 fingerTipPoints.AddRange(tip.Value);
@@ -419,6 +420,7 @@ namespace MotionGestureProcessing
 
             BitmapManip.unlockBitmap(ref garbage, ref garbageData, img);
             img.Save("fingerTips.jpg");
+             */
 
             return fingerTips;
         }
@@ -670,8 +672,19 @@ namespace MotionGestureProcessing
                 {
                     //determine which defect has the largest area
                     ConvexDefect maxDefect = p_defects.Where(x => (int)x.Area == (int)p_defects.Max(d => d.Area)).ToList().First();
-                    
-                    do
+
+                    List<int> tipsToRemove = new List<int>();
+                    //first remove all points that aren't within a defect
+                    foreach (KeyValuePair<int, Point> tip in reducedPoints)
+                    {
+                        if (p_defects.Where(x => x.contains(tip.Value)).ToList().Count == 0)
+                            tipsToRemove.Add(tip.Key);
+                    }
+                    foreach (int key in tipsToRemove)
+                        reducedPoints.Remove(key);
+                    //reducedPoints = reducedPoints.Where(x => maxDefect.contains(x.Value)).ToDictionary(pair => pair.Key, pair => pair.Value);
+
+                    while (reducedPoints.Count > 4 - p_defects.Count)
                     {
                         max = 0.0;
                         //remove points farthest from the defect with the largest area 
@@ -689,7 +702,6 @@ namespace MotionGestureProcessing
 
                         reducedPoints.Remove(maxPoint.Key);
                     }
-                    while (reducedPoints.Count > 5 - p_defects.Count + 1);
                 }
 
                 fingerTipPoints.AddRange(reducedPoints.Values);

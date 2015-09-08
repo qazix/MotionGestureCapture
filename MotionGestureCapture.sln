@@ -15,6 +15,16 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ImageProcessing", "ImagePro
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DebugFunctions", "DebugFunctions\DebugFunctions.csproj", "{FE9A9067-4594-4C20-95AF-15A0AF8002BD}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Images", "Images", "{5E25B6DC-9799-4D09-A062-6CB8E0F36AB5}"
+	ProjectSection(SolutionItems) = preProject
+		Images\click_and_hold.bmp = Images\click_and_hold.bmp
+		Images\double_click.bmp = Images\double_click.bmp
+		Images\initialize.bmp = Images\initialize.bmp
+		Images\mouse_left_click-128.bmp = Images\mouse_left_click-128.bmp
+		Images\mouse_right_click.bmp = Images\mouse_right_click.bmp
+		Images\move.bmp = Images\move.bmp
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU

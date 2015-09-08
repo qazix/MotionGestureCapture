@@ -49,7 +49,7 @@ namespace MotionGestureProcessing
                 List<ConvexDefect> convexDefects = ((ImageData)p_imgData).ConvexDefects;
                 List<Point> fingerTips = ((ImageData)p_imgData).FingerTips;
 
-                gesture = deriveGesture(ref convexDefects, ref fingerTips);
+                ((ImageData)p_imgData).Gesture = deriveGesture(ref convexDefects, ref fingerTips);
 
             }
             

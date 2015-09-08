@@ -405,6 +405,7 @@ namespace MotionGestureProcessing
             else
                 fingerTips = fingerTips.OrderByDescending(x => x.Value.Count).Take(5).ToDictionary(pair => pair.Key, pair => pair.Value);
 
+            /*
             List<Point> fingerTipPoints = new List<Point>();
             foreach (KeyValuePair<int, List<Point>> tip in fingerTips)
                 fingerTipPoints.AddRange(tip.Value);
@@ -419,6 +420,7 @@ namespace MotionGestureProcessing
 
             BitmapManip.unlockBitmap(ref garbage, ref garbageData, img);
             img.Save("fingerTips.jpg");
+             */
 
             return fingerTips;
         }

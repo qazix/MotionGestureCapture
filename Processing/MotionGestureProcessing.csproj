@@ -49,6 +49,11 @@
     <Compile Include="Process.cs" />
     <Compile Include="Processing.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Properties\Resources.Designer.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Resources.resx</DependentUpon>
+    </Compile>
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\DebugFunctions\DebugFunctions.csproj">
@@ -63,6 +68,30 @@
       <Project>{f132e93a-ccb6-478a-8f52-c898c4332436}</Project>
       <Name>MotionGestureCapture</Name>
     </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Properties\Resources.resx">
+      <Generator>ResXFileCodeGenerator</Generator>
+      <LastGenOutput>Resources.Designer.cs</LastGenOutput>
+    </EmbeddedResource>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Resources\click_and_hold.bmp" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Resources\double_click.bmp" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Resources\initialize.bmp" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Resources\mouse_left_click-128.bmp" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Resources\mouse_right_click.bmp" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Resources\move.bmp" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

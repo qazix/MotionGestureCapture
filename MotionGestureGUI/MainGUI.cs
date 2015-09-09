@@ -18,7 +18,10 @@ namespace MotionGestureCapture
         /* Object for handling display and capture */
         private CamCapture m_camCapture;
         private Processing m_processing;
-        private PictureBox m_initSquare;
+        private Processing.ImageReadyHandler m_handler;
+        private Image m_testImage;
+        private Point m_identifiedCenter;
+        private Point m_identifiedOrientation;
         
         /// <summary>
         /// Initialize all the components
@@ -37,7 +40,9 @@ namespace MotionGestureCapture
             comboBox1.DataSource = m_capDevBinding.DataSource;
 
             mainAlteredFeed.SizeMode = PictureBoxSizeMode.StretchImage;
+            capturePic.SizeMode = PictureBoxSizeMode.StretchImage;
             testingPic.SizeMode = PictureBoxSizeMode.StretchImage;
+            transperency.SizeMode = PictureBoxSizeMode.StretchImage;
 
             //Set up processing
             m_processing = Processing.getInstance();
@@ -46,8 +51,6 @@ namespace MotionGestureCapture
             //I want to have the feed running right when the aplication starts
             m_camCapture.CaptureWindow = mainLiveFeed;
             m_camCapture.start();
-
-            setupInitSquare();
         }
 
         /// <summary>
@@ -55,10 +58,8 @@ namespace MotionGestureCapture
         /// </summary>
         private void setupProcessingListener()
         {
-            Processing.ImageReadyHandler handler = null;
-
             //Sets the altered feed to the image if the altered feed is on screen
-            handler = (imgData) =>
+            m_handler = (imgData) =>
             {   
                 if (tabControl1.SelectedIndex == 0)
                     mainAlteredFeed.Image = imgData.Image;
@@ -66,44 +67,16 @@ namespace MotionGestureCapture
                     testingPic.Image = imgData.Image;
             };
 
-            m_processing.ReturnImageFilled += handler;
+            m_processing.ReturnImageFilled += m_handler;
         }
 
         /// <summary>
-        /// This is suppose to put a green overlay on th main picture box
+        /// removes the handler from the event
         /// </summary>
-        private void setupInitSquare()
+        private void disposeListener()
         {
-            m_initSquare = new PictureBox();
-            m_initSquare.BackColor = Color.Transparent;
-            m_initSquare.Parent = mainLiveFeed;
-            m_initSquare.Size = mainLiveFeed.Size;
-            m_initSquare.Location = mainLiveFeed.Location;
-            
-            //populate Bitmap
-            Bitmap square = new Bitmap(mainLiveFeed.Width, mainLiveFeed.Height);
 
-            int endX = (square.Width / 2) + 50;
-            int endY = (square.Height / 2) + 50;
-            int startX = endX - 100;
-            int startY = endY - 100;
-            for (int y = startY; y <= endY; ++y)
-            {
-                if (y != startY && y != endY)
-                {
-                    square.SetPixel(startX, y, Color.LimeGreen);
-                    square.SetPixel(endX, y, Color.LimeGreen);
-                }
-                else
-                {
-                    for (int x = startX; x <= endX; ++x)
-                        square.SetPixel(x, y, Color.LimeGreen);
-                }
-            }
-            square.Save("TestSquare.bmp");
-
-            //Add bitmap to pictureBox
-            m_initSquare.Image = square;
+            m_processing.ReturnImageFilled -= m_handler;
         }
 
         /// <summary>
@@ -137,7 +110,7 @@ namespace MotionGestureCapture
             m_camCapture.FilterIndex = comboBox1.SelectedIndex;
             if (tempRunning)
             {
-                m_camCapture.CaptureWindow = (tabControl1.SelectedIndex == 0 ? mainLiveFeed : testingPic);
+                m_camCapture.CaptureWindow = (tabControl1.SelectedIndex == 0 ? mainLiveFeed : capturePic);
                 m_camCapture.start();
             }
         }
@@ -150,19 +123,21 @@ namespace MotionGestureCapture
         private void tabControl_SelectedIndexChanged(object sender, EventArgs e)
         {
             m_camCapture.stop();
-            //m_processing.stop();
+            disposeListener();
+            setupProcessingListener();
+
             switch (tabControl1.SelectedIndex)
             {
                 case 0:
                     m_camCapture.CaptureWindow = mainLiveFeed;
-                    m_camCapture.start();
                     break;
                 case 1:
-                    m_camCapture.CaptureWindow = testingPic;
+                    m_camCapture.CaptureWindow = capturePic;
                     capButton.Text = "Capture";
-                    m_camCapture.start();
                     break;
             }
+
+            m_camCapture.start();
         }
 
         /// <summary>
@@ -170,36 +145,132 @@ namespace MotionGestureCapture
         /// </summary>
         private void testInit_Click(object sender, EventArgs e)
         {
-            m_processing.initialize(false);
+            if (handUsedCombo.SelectedIndex <= 0)
+                handUsedWarning.Visible = true;
+            else
+            {
+                m_processing.initialize(false, handUsedCombo.SelectedIndex);
+                handUsedWarning.Visible = false;
+            }
         }
 
         /// <summary>
         /// Either captures a single image or resumes capture
         /// </summary>
-        private void capButton_Click(object sender, EventArgs e)
+        private async void capButton_Click(object sender, EventArgs e)
         {
             //Handle changing the text
             if (capButton.Text == "Capture")
             {
+                identifiedX.Text = "";
+                identifiedY.Text = "";
+                identifiedOri.Text = "";
+                identifiedGest.SelectedIndex = 0;
                 capButton.Text = "Resume";
+                testButton.Visible = true;
+                m_testImage = await m_camCapture.grabImage();
+                transperency.Image = m_testImage;
+                transperency.Visible = true;
+                m_camCapture.stop();
+            }
+            else
+            {
+                capButton.Text = "Capture";
+                testButton.Visible = false;
+                transperency.Visible = false;
+                m_camCapture.start();
+            }
+        }
 
+        private void testButton_Click(object sender, EventArgs e)
+        {
+            if (!identifiedX.Text.Equals("") && !identifiedY.Text.Equals("") &&
+                !identifiedOri.Text.Equals("") && identifiedGest.SelectedIndex > 0)
+            {
+                featuresWarning.Visible = false;
                 //Add the stop functionality after grabbing an image
                 Processing.ImageReadyHandler handler = null;
                 handler = (imgData) =>
                 {
                     m_processing.ReturnImageFilled -= handler;
-                    m_camCapture.stop();
+                    extractData(imgData);
                 };
 
                 m_processing.ReturnImageFilled += handler;
-                
-                m_processing.oneShot();
+
+                m_processing.test(m_testImage);
             }
             else
-            {
-                capButton.Text = "Capture";
-                m_camCapture.start();
-            }
+                featuresWarning.Visible = true;
+
         }
+
+        /// <summary>
+        /// This takes the data from the imageData object and populates the GUI
+        /// </summary>
+        /// <param name="imgData"></param>
+        private void extractData(ImageData imgData)
+        {
+            //Position
+            double positionError;
+            Point identifiedCenter = new Point(Convert.ToInt32(identifiedX.Text),
+                                               Convert.ToInt32(identifiedY.Text));
+            Point measuredCenter = imgData.Center;
+            measuredCenter.X -= imgData.Image.Width / 2;
+            measuredCenter.Y = (imgData.Image.Height / 2) - measuredCenter.Y;
+            measuredX.Text = measuredCenter.X.ToString();
+            measuredY.Text = measuredCenter.Y.ToString();
+
+            positionError = (Math.Abs((measuredCenter.X - identifiedCenter.X) / identifiedCenter.X) +
+                             Math.Abs((measuredCenter.Y - identifiedCenter.Y) / identifiedCenter.Y)) * 100;
+            positionChange.Text = positionError.ToString();
+
+            //Orientation
+            measuredOri.Text = imgData.Orientation.ToString("F2");
+            oriDifference.Text = Math.Abs(Convert.ToDouble(measuredOri.Text) - imgData.Orientation).ToString();
+
+            //Gesture
+            measuredGest.SelectedIndex = (int)imgData.Gesture;
+            if (identifiedGest.SelectedIndex == measuredGest.SelectedIndex)
+                areGesturesEqual.SelectedIndex = 1;
+            else
+                areGesturesEqual.SelectedIndex = 2;
+
+        }
+
+        private void transperency_MouseDown(object sender, MouseEventArgs e)
+        {
+            m_identifiedCenter = e.Location;
+            m_identifiedCenter.X = m_identifiedCenter.X * m_testImage.Width / ((PictureBox)sender).Width - (m_testImage.Width / 2);
+            m_identifiedCenter.Y = (m_testImage.Height / 2) - m_identifiedCenter.Y * m_testImage.Height / ((PictureBox)sender).Height;
+            identifiedX.Text = m_identifiedCenter.X.ToString();
+            identifiedY.Text = m_identifiedCenter.Y.ToString();
+        }
+
+        private void transperency_MouseUp(object sender, MouseEventArgs e)
+        {
+            double sideA2, sideB2, sideC2, angleA;
+            m_identifiedOrientation = e.Location;
+            m_identifiedOrientation.X = m_identifiedOrientation.X * m_testImage.Width / ((PictureBox)sender).Width - (m_testImage.Width / 2);
+            m_identifiedOrientation.Y = (m_testImage.Height / 2) - m_identifiedOrientation.Y * m_testImage.Height / ((PictureBox)sender).Height;
+            Point north = new Point(m_identifiedCenter.X, m_testImage.Height / 2);
+
+            sideA2 = (north.X - m_identifiedOrientation.X) * (north.X - m_identifiedOrientation.X) +
+                     (north.Y - m_identifiedOrientation.Y) * (north.Y - m_identifiedOrientation.Y);
+            sideB2 = (m_identifiedOrientation.X - m_identifiedCenter.X) * (m_identifiedOrientation.X - m_identifiedCenter.X) +
+                     (m_identifiedOrientation.Y - m_identifiedCenter.Y) * (m_identifiedOrientation.Y - m_identifiedCenter.Y);
+            sideC2 = (north.Y - m_identifiedCenter.Y) * (north.Y - m_identifiedCenter.Y);
+
+            //Law of cosines a^2 = b^2 + c^2 - 2bc * cosA
+            //Solving for A = cos^-1((b^2 + c^2 - a^2) / 2bc)
+            angleA = Math.Acos((sideB2 + sideC2 - sideA2) / (2 * Math.Sqrt(sideB2) * Math.Sqrt(sideC2))) * 180 / Math.PI;
+
+            if (m_identifiedOrientation.X < m_identifiedCenter.X)
+                angleA = 360.0 - angleA;
+
+
+            identifiedOri.Text = angleA.ToString("F2");
+        }
+
     }
 }

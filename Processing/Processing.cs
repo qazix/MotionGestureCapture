@@ -139,7 +139,7 @@ namespace MotionGestureProcessing
         /// <summary>
         /// Starts initialize on those processes that require initialization
         /// </summary>
-        public async void initialize(bool toRun)
+        public async void initialize(bool p_toRun, int p_handedness = 0)
         {
             //If it's already initialized first stop
             if (IsInitialized)
@@ -153,11 +153,11 @@ namespace MotionGestureProcessing
             m_handIso.initialize(id);
             m_preProc.initialize();
             m_PCA.initialize();
-            m_gesture.initialize();
+            m_gesture.initialize(p_handedness);
             m_drawing.initialize();
 
             IsInitialized = true;
-            if (toRun)
+            if (p_toRun)
                 start();
         }
 
@@ -193,6 +193,15 @@ namespace MotionGestureProcessing
         {
             if (m_camCapture.Running)
                 ToIsolationImage = new ImageData(false, await m_camCapture.grabImage());
+        }
+
+        /// <summary>
+        /// This is to run tests on an image
+        /// </summary>
+        /// <param name="p_testImg"></param>
+        public void test(Image p_testImg)
+        {
+            ToIsolationImage = new ImageData(false, p_testImg);
         }
 
         /// <summary>

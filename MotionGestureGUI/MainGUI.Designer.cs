@@ -37,13 +37,22 @@
             this.label14 = new System.Windows.Forms.Label();
             this.mainAlteredFeed = new System.Windows.Forms.PictureBox();
             this.tabPage2 = new System.Windows.Forms.TabPage();
+            this.transperency = new System.Windows.Forms.PictureBox();
+            this.featuresWarning = new System.Windows.Forms.Label();
+            this.handUsedWarning = new System.Windows.Forms.Label();
+            this.groupBox4 = new System.Windows.Forms.GroupBox();
+            this.label17 = new System.Windows.Forms.Label();
+            this.handUsedCombo = new System.Windows.Forms.ComboBox();
+            this.label22 = new System.Windows.Forms.Label();
+            this.testingPic = new System.Windows.Forms.PictureBox();
+            this.testButton = new System.Windows.Forms.Button();
             this.label16 = new System.Windows.Forms.Label();
             this.label15 = new System.Windows.Forms.Label();
             this.testInit = new System.Windows.Forms.Button();
             this.capButton = new System.Windows.Forms.Button();
-            this.testingPic = new System.Windows.Forms.PictureBox();
+            this.capturePic = new System.Windows.Forms.PictureBox();
             this.groupBox3 = new System.Windows.Forms.GroupBox();
-            this.comboBox2 = new System.Windows.Forms.ComboBox();
+            this.areGesturesEqual = new System.Windows.Forms.ComboBox();
             this.label12 = new System.Windows.Forms.Label();
             this.label11 = new System.Windows.Forms.Label();
             this.measuredGest = new System.Windows.Forms.ComboBox();
@@ -58,7 +67,7 @@
             this.label7 = new System.Windows.Forms.Label();
             this.label6 = new System.Windows.Forms.Label();
             this.groupBox1 = new System.Windows.Forms.GroupBox();
-            this.textBox1 = new System.Windows.Forms.TextBox();
+            this.positionChange = new System.Windows.Forms.TextBox();
             this.posMoE = new System.Windows.Forms.Label();
             this.label5 = new System.Windows.Forms.Label();
             this.measuredY = new System.Windows.Forms.TextBox();
@@ -75,7 +84,10 @@
             this.tabPage1.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.mainAlteredFeed)).BeginInit();
             this.tabPage2.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)(this.transperency)).BeginInit();
+            this.groupBox4.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.testingPic)).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)(this.capturePic)).BeginInit();
             this.groupBox3.SuspendLayout();
             this.groupBox2.SuspendLayout();
             this.groupBox1.SuspendLayout();
@@ -159,11 +171,17 @@
             // 
             // tabPage2
             // 
+            this.tabPage2.Controls.Add(this.transperency);
+            this.tabPage2.Controls.Add(this.featuresWarning);
+            this.tabPage2.Controls.Add(this.handUsedWarning);
+            this.tabPage2.Controls.Add(this.groupBox4);
+            this.tabPage2.Controls.Add(this.testingPic);
+            this.tabPage2.Controls.Add(this.testButton);
             this.tabPage2.Controls.Add(this.label16);
             this.tabPage2.Controls.Add(this.label15);
             this.tabPage2.Controls.Add(this.testInit);
             this.tabPage2.Controls.Add(this.capButton);
-            this.tabPage2.Controls.Add(this.testingPic);
+            this.tabPage2.Controls.Add(this.capturePic);
             this.tabPage2.Controls.Add(this.groupBox3);
             this.tabPage2.Controls.Add(this.groupBox2);
             this.tabPage2.Controls.Add(this.groupBox1);
@@ -176,25 +194,129 @@
             this.tabPage2.Text = "Testing";
             this.tabPage2.UseVisualStyleBackColor = true;
             // 
+            // transperency
+            // 
+            this.transperency.InitialImage = null;
+            this.transperency.Location = new System.Drawing.Point(5, 5);
+            this.transperency.Margin = new System.Windows.Forms.Padding(2);
+            this.transperency.Name = "transperency";
+            this.transperency.Size = new System.Drawing.Size(224, 161);
+            this.transperency.TabIndex = 18;
+            this.transperency.TabStop = false;
+            this.transperency.Visible = false;
+            this.transperency.MouseDown += new System.Windows.Forms.MouseEventHandler(this.transperency_MouseDown);
+            this.transperency.MouseUp += new System.Windows.Forms.MouseEventHandler(this.transperency_MouseUp);
+            // 
+            // featuresWarning
+            // 
+            this.featuresWarning.AutoSize = true;
+            this.featuresWarning.ForeColor = System.Drawing.Color.Red;
+            this.featuresWarning.Location = new System.Drawing.Point(310, 298);
+            this.featuresWarning.Margin = new System.Windows.Forms.Padding(2, 0, 2, 0);
+            this.featuresWarning.Name = "featuresWarning";
+            this.featuresWarning.Size = new System.Drawing.Size(124, 13);
+            this.featuresWarning.TabIndex = 17;
+            this.featuresWarning.Text = "* To test identify features";
+            this.featuresWarning.Visible = false;
+            // 
+            // handUsedWarning
+            // 
+            this.handUsedWarning.AutoSize = true;
+            this.handUsedWarning.ForeColor = System.Drawing.Color.Red;
+            this.handUsedWarning.Location = new System.Drawing.Point(310, 272);
+            this.handUsedWarning.Margin = new System.Windows.Forms.Padding(2, 0, 2, 0);
+            this.handUsedWarning.Name = "handUsedWarning";
+            this.handUsedWarning.Size = new System.Drawing.Size(213, 13);
+            this.handUsedWarning.TabIndex = 16;
+            this.handUsedWarning.Text = "* To initialize select which hand will be used";
+            this.handUsedWarning.Visible = false;
+            // 
+            // groupBox4
+            // 
+            this.groupBox4.Controls.Add(this.label17);
+            this.groupBox4.Controls.Add(this.handUsedCombo);
+            this.groupBox4.Controls.Add(this.label22);
+            this.groupBox4.Location = new System.Drawing.Point(238, 5);
+            this.groupBox4.Margin = new System.Windows.Forms.Padding(2);
+            this.groupBox4.Name = "groupBox4";
+            this.groupBox4.Padding = new System.Windows.Forms.Padding(2);
+            this.groupBox4.Size = new System.Drawing.Size(164, 88);
+            this.groupBox4.TabIndex = 15;
+            this.groupBox4.TabStop = false;
+            this.groupBox4.Text = "Hand Used";
+            // 
+            // label17
+            // 
+            this.label17.AutoSize = true;
+            this.label17.Location = new System.Drawing.Point(-3, 63);
+            this.label17.Margin = new System.Windows.Forms.Padding(2, 0, 2, 0);
+            this.label17.Name = "label17";
+            this.label17.Size = new System.Drawing.Size(171, 13);
+            this.label17.TabIndex = 16;
+            this.label17.Text = "*must be selected before initializing";
+            // 
+            // handUsedCombo
+            // 
+            this.handUsedCombo.FormattingEnabled = true;
+            this.handUsedCombo.Items.AddRange(new object[] {
+            "",
+            "Left",
+            "Right"});
+            this.handUsedCombo.Location = new System.Drawing.Point(14, 33);
+            this.handUsedCombo.Margin = new System.Windows.Forms.Padding(2);
+            this.handUsedCombo.Name = "handUsedCombo";
+            this.handUsedCombo.Size = new System.Drawing.Size(92, 21);
+            this.handUsedCombo.TabIndex = 4;
+            // 
+            // label22
+            // 
+            this.label22.AutoSize = true;
+            this.label22.Location = new System.Drawing.Point(11, 20);
+            this.label22.Margin = new System.Windows.Forms.Padding(2, 0, 2, 0);
+            this.label22.Name = "label22";
+            this.label22.Size = new System.Drawing.Size(0, 13);
+            this.label22.TabIndex = 3;
+            // 
+            // testingPic
+            // 
+            this.testingPic.Location = new System.Drawing.Point(8, 169);
+            this.testingPic.Margin = new System.Windows.Forms.Padding(2);
+            this.testingPic.Name = "testingPic";
+            this.testingPic.Size = new System.Drawing.Size(298, 214);
+            this.testingPic.TabIndex = 14;
+            this.testingPic.TabStop = false;
+            // 
+            // testButton
+            // 
+            this.testButton.Location = new System.Drawing.Point(169, 387);
+            this.testButton.Margin = new System.Windows.Forms.Padding(2);
+            this.testButton.Name = "testButton";
+            this.testButton.Size = new System.Drawing.Size(76, 30);
+            this.testButton.TabIndex = 13;
+            this.testButton.Text = "Test";
+            this.testButton.UseVisualStyleBackColor = true;
+            this.testButton.Visible = false;
+            this.testButton.Click += new System.EventHandler(this.testButton_Click);
+            // 
             // label16
             // 
             this.label16.AutoSize = true;
-            this.label16.Location = new System.Drawing.Point(176, 404);
+            this.label16.Location = new System.Drawing.Point(277, 404);
             this.label16.Margin = new System.Windows.Forms.Padding(2, 0, 2, 0);
             this.label16.Name = "label16";
-            this.label16.Size = new System.Drawing.Size(334, 13);
+            this.label16.Size = new System.Drawing.Size(352, 13);
             this.label16.TabIndex = 12;
-            this.label16.Text = "* Capture will run the test, but only after the system has been initialzed";
+            this.label16.Text = "* \"Capture\" will get an image prepared.  After identifying feature hit \"Test\"";
             // 
             // label15
             // 
             this.label15.AutoSize = true;
-            this.label15.Location = new System.Drawing.Point(176, 387);
+            this.label15.Location = new System.Drawing.Point(277, 387);
             this.label15.Margin = new System.Windows.Forms.Padding(2, 0, 2, 0);
             this.label15.Name = "label15";
-            this.label15.Size = new System.Drawing.Size(345, 13);
+            this.label15.Size = new System.Drawing.Size(242, 13);
             this.label15.TabIndex = 11;
-            this.label15.Text = "* To initialize place you hand in the center clear image of the foreground";
+            this.label15.Text = "* To initialize remove anything from the foreground";
             // 
             // testInit
             // 
@@ -218,18 +340,18 @@
             this.capButton.UseVisualStyleBackColor = true;
             this.capButton.Click += new System.EventHandler(this.capButton_Click);
             // 
-            // testingPic
+            // capturePic
             // 
-            this.testingPic.Location = new System.Drawing.Point(5, 5);
-            this.testingPic.Margin = new System.Windows.Forms.Padding(2);
-            this.testingPic.Name = "testingPic";
-            this.testingPic.Size = new System.Drawing.Size(397, 351);
-            this.testingPic.TabIndex = 8;
-            this.testingPic.TabStop = false;
+            this.capturePic.Location = new System.Drawing.Point(5, 5);
+            this.capturePic.Margin = new System.Windows.Forms.Padding(2);
+            this.capturePic.Name = "capturePic";
+            this.capturePic.Size = new System.Drawing.Size(224, 161);
+            this.capturePic.TabIndex = 8;
+            this.capturePic.TabStop = false;
             // 
             // groupBox3
             // 
-            this.groupBox3.Controls.Add(this.comboBox2);
+            this.groupBox3.Controls.Add(this.areGesturesEqual);
             this.groupBox3.Controls.Add(this.label12);
             this.groupBox3.Controls.Add(this.label11);
             this.groupBox3.Controls.Add(this.measuredGest);
@@ -244,14 +366,19 @@
             this.groupBox3.TabStop = false;
             this.groupBox3.Text = "Gesture";
             // 
-            // comboBox2
+            // areGesturesEqual
             // 
-            this.comboBox2.FormattingEnabled = true;
-            this.comboBox2.Location = new System.Drawing.Point(224, 31);
-            this.comboBox2.Margin = new System.Windows.Forms.Padding(2);
-            this.comboBox2.Name = "comboBox2";
-            this.comboBox2.Size = new System.Drawing.Size(76, 21);
-            this.comboBox2.TabIndex = 5;
+            this.areGesturesEqual.Enabled = false;
+            this.areGesturesEqual.FormattingEnabled = true;
+            this.areGesturesEqual.Items.AddRange(new object[] {
+            "",
+            "Yes",
+            "No"});
+            this.areGesturesEqual.Location = new System.Drawing.Point(224, 31);
+            this.areGesturesEqual.Margin = new System.Windows.Forms.Padding(2);
+            this.areGesturesEqual.Name = "areGesturesEqual";
+            this.areGesturesEqual.Size = new System.Drawing.Size(76, 21);
+            this.areGesturesEqual.TabIndex = 5;
             // 
             // label12
             // 
@@ -277,6 +404,13 @@
             // 
             this.measuredGest.Enabled = false;
             this.measuredGest.FormattingEnabled = true;
+            this.measuredGest.Items.AddRange(new object[] {
+            "",
+            "Move",
+            "Right-Click",
+            "Left-Click",
+            "Click-and-Hold",
+            "Double-Click"});
             this.measuredGest.Location = new System.Drawing.Point(124, 31);
             this.measuredGest.Margin = new System.Windows.Forms.Padding(2);
             this.measuredGest.Name = "measuredGest";
@@ -296,6 +430,13 @@
             // identifiedGest
             // 
             this.identifiedGest.FormattingEnabled = true;
+            this.identifiedGest.Items.AddRange(new object[] {
+            "",
+            "Move",
+            "Right-Click",
+            "Left-Click",
+            "Click-and-Hold",
+            "Double-Click"});
             this.identifiedGest.Location = new System.Drawing.Point(28, 31);
             this.identifiedGest.Margin = new System.Windows.Forms.Padding(2);
             this.identifiedGest.Name = "identifiedGest";
@@ -389,7 +530,7 @@
             // 
             // groupBox1
             // 
-            this.groupBox1.Controls.Add(this.textBox1);
+            this.groupBox1.Controls.Add(this.positionChange);
             this.groupBox1.Controls.Add(this.posMoE);
             this.groupBox1.Controls.Add(this.label5);
             this.groupBox1.Controls.Add(this.measuredY);
@@ -409,14 +550,14 @@
             this.groupBox1.TabStop = false;
             this.groupBox1.Text = "Position";
             // 
-            // textBox1
+            // positionChange
             // 
-            this.textBox1.Enabled = false;
-            this.textBox1.Location = new System.Drawing.Point(196, 33);
-            this.textBox1.Margin = new System.Windows.Forms.Padding(2);
-            this.textBox1.Name = "textBox1";
-            this.textBox1.Size = new System.Drawing.Size(88, 20);
-            this.textBox1.TabIndex = 10;
+            this.positionChange.Enabled = false;
+            this.positionChange.Location = new System.Drawing.Point(196, 33);
+            this.positionChange.Margin = new System.Windows.Forms.Padding(2);
+            this.positionChange.Name = "positionChange";
+            this.positionChange.Size = new System.Drawing.Size(88, 20);
+            this.positionChange.TabIndex = 10;
             // 
             // posMoE
             // 
@@ -542,7 +683,11 @@
             ((System.ComponentModel.ISupportInitialize)(this.mainAlteredFeed)).EndInit();
             this.tabPage2.ResumeLayout(false);
             this.tabPage2.PerformLayout();
+            ((System.ComponentModel.ISupportInitialize)(this.transperency)).EndInit();
+            this.groupBox4.ResumeLayout(false);
+            this.groupBox4.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)(this.testingPic)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.capturePic)).EndInit();
             this.groupBox3.ResumeLayout(false);
             this.groupBox3.PerformLayout();
             this.groupBox2.ResumeLayout(false);
@@ -582,22 +727,31 @@
         private System.Windows.Forms.TextBox identifiedOri;
         private System.Windows.Forms.Label label7;
         private System.Windows.Forms.Label label6;
-        private System.Windows.Forms.TextBox textBox1;
+        private System.Windows.Forms.TextBox positionChange;
         private System.Windows.Forms.Label posMoE;
         private System.Windows.Forms.Label label11;
         private System.Windows.Forms.ComboBox measuredGest;
         private System.Windows.Forms.Label label10;
         private System.Windows.Forms.ComboBox identifiedGest;
         private System.Windows.Forms.PictureBox mainAlteredFeed;
-        private System.Windows.Forms.ComboBox comboBox2;
+        private System.Windows.Forms.ComboBox areGesturesEqual;
         private System.Windows.Forms.Label label12;
         private System.Windows.Forms.Label label13;
         private System.Windows.Forms.Button capButton;
-        private System.Windows.Forms.PictureBox testingPic;
+        private System.Windows.Forms.PictureBox capturePic;
         private System.Windows.Forms.Button testInit;
         private System.Windows.Forms.Label label14;
         private System.Windows.Forms.Label label16;
         private System.Windows.Forms.Label label15;
+        private System.Windows.Forms.Button testButton;
+        private System.Windows.Forms.GroupBox groupBox4;
+        private System.Windows.Forms.Label label22;
+        private System.Windows.Forms.PictureBox testingPic;
+        private System.Windows.Forms.ComboBox handUsedCombo;
+        private System.Windows.Forms.Label handUsedWarning;
+        private System.Windows.Forms.Label label17;
+        private System.Windows.Forms.Label featuresWarning;
+        private System.Windows.Forms.PictureBox transperency;
     }
 }
 

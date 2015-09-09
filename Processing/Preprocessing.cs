@@ -61,9 +61,9 @@ namespace MotionGestureProcessing
                 //defects
                 double defectThreshold;
                 if (m_direction == DIRECTION.LEFT || m_direction == DIRECTION.RIGHT)
-                    defectThreshold = ((ImageData)p_imgData).Filter.Width * .2;
+                    defectThreshold = ((ImageData)p_imgData).Filter.Width * .15;
                 else
-                    defectThreshold = ((ImageData)p_imgData).Filter.Height * .2;
+                    defectThreshold = ((ImageData)p_imgData).Filter.Height * .15;
                 ((ImageData)p_imgData).ConvexDefects = ImageProcess.getConvexDefects(((ImageData)p_imgData).Contour, ((ImageData)p_imgData).ConvexHull,
                                                                                      defectThreshold);
                 ((ImageData)p_imgData).ConvexDefects = organizeDefects(((ImageData)p_imgData).ConvexDefects);

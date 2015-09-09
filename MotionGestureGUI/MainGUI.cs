@@ -212,7 +212,7 @@ namespace MotionGestureCapture
         private void extractData(ImageData imgData)
         {
             //Position
-            double positionError;
+            double positionError, oriDiff;
             Point identifiedCenter = new Point(Convert.ToInt32(identifiedX.Text),
                                                Convert.ToInt32(identifiedY.Text));
             Point measuredCenter = imgData.Center;
@@ -221,13 +221,15 @@ namespace MotionGestureCapture
             measuredX.Text = measuredCenter.X.ToString();
             measuredY.Text = measuredCenter.Y.ToString();
 
-            positionError = (Math.Abs((measuredCenter.X - identifiedCenter.X) / identifiedCenter.X) +
-                             Math.Abs((measuredCenter.Y - identifiedCenter.Y) / identifiedCenter.Y)) * 100;
-            positionChange.Text = positionError.ToString();
+            positionError = (Math.Abs((double)(measuredCenter.X - identifiedCenter.X) / identifiedCenter.X) +
+                             Math.Abs((double)(measuredCenter.Y - identifiedCenter.Y) / identifiedCenter.Y)) * 100;
+            positionChange.Text = positionError.ToString("F2");
 
             //Orientation
             measuredOri.Text = imgData.Orientation.ToString("F2");
-            oriDifference.Text = Math.Abs(Convert.ToDouble(measuredOri.Text) - imgData.Orientation).ToString();
+            oriDiff = Convert.ToDouble(identifiedOri.Text);
+            oriDiff = Math.Abs((imgData.Orientation - oriDiff + 540) % 360 - 180);
+            oriDifference.Text = oriDiff.ToString("F2");
 
             //Gesture
             measuredGest.SelectedIndex = (int)imgData.Gesture;

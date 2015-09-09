@@ -649,7 +649,7 @@ namespace MotionGestureProcessing
                 fingerTipPoints.Add(new Point(p_defects[0].StartPoint.X, p_defects[0].StartPoint.Y));
                 reducedPoints.Remove(minPoint.Key);
 
-                //add points to fingerTipPoints
+                //add points for each start and end point in p_defects
                 foreach (ConvexDefect cd in p_defects)
                 {
                     min = int.MaxValue;
@@ -684,18 +684,18 @@ namespace MotionGestureProcessing
                     }
                     foreach (int key in tipsToRemove)
                         reducedPoints.Remove(key);
-                    //reducedPoints = reducedPoints.Where(x => maxDefect.contains(x.Value)).ToDictionary(pair => pair.Key, pair => pair.Value);
 
+                    //remove points farthest from the defect with the largest area 
                     while (reducedPoints.Count > 4 - p_defects.Count)
                     {
-                        max = 0.0;
-                        //remove points farthest from the defect with the largest area 
+                        max = int.MaxValue;
+
                         foreach (KeyValuePair<int, Point> tip in reducedPoints)
                         {
                             dist = (maxDefect.DeepestPoint.X - tip.Value.X) * (maxDefect.DeepestPoint.X - tip.Value.X) +
                                    (maxDefect.DeepestPoint.Y - tip.Value.Y) * (maxDefect.DeepestPoint.Y - tip.Value.Y);
 
-                            if (dist > max)
+                            if (dist < max)
                             {
                                 max = dist;
                                 maxPoint = tip;

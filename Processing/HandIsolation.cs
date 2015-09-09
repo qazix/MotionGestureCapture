@@ -53,7 +53,7 @@ namespace MotionGestureProcessing
             //convert background to greyscale and get threshold from image
             BitmapData data = BitmapManip.lockBitmap(out m_backGround, toInit);
             ImageProcess.convert2GreyScale(ref m_backGround);
-            m_threshold = (int)ImageProcess.otsuThreshold(m_backGround) / 8;
+            m_threshold = (int)ImageProcess.otsuThreshold(m_backGround) / 2;
             BitmapManip.unlockBitmap(ref m_backGround, ref data, toInit);
 
             m_isInitialized = true;

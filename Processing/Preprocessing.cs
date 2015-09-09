@@ -556,6 +556,7 @@ namespace MotionGestureProcessing
             }
             #endregion
             #region Hard Reduction
+                //TODO fix left click to have higher accuracy
             else if (p_defects.Count > 0 && p_defects.Count < 4)
             {
                 Dictionary<int, Point> reducedPoints = new Dictionary<int, Point>();

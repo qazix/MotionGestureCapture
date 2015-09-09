@@ -139,8 +139,6 @@ namespace ImageProcessing
         #endregion
 
         #region Convex Defects
-        private static int M_REDUCTION = 4;
-
         /// <summary>
         /// Using snakes from each line of the hull towards the center to find
         ///  the convex defects 

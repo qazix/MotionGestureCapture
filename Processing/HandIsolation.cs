@@ -53,7 +53,7 @@ namespace MotionGestureProcessing
             //convert background to greyscale and get threshold from image
             BitmapData data = BitmapManip.lockBitmap(out m_backGround, toInit);
             ImageProcess.convert2GreyScale(ref m_backGround);
-            m_threshold = (int)ImageProcess.otsuThreshold(m_backGround) / 2;
+            m_threshold = (int)ImageProcess.otsuThreshold(m_backGround) / 4;
             BitmapManip.unlockBitmap(ref m_backGround, ref data, toInit);
 
             m_isInitialized = true;
@@ -253,27 +253,6 @@ namespace MotionGestureProcessing
                 (p_inc < 0 && p_start < 3))
             {
                 p_start = p_searchSpace.Length / 2;
-            }
-        }
-
-        /// <summary>
-        /// Smooth a histogram
-        /// </summary>
-        /// <param name="p_searchSpace">initial histogram</param>
-        /// <param name="p_smoothSpace">smoothed histogram</param>
-        private void smoothing(ref int[] p_searchSpace, ref int[] p_smoothSpace)
-        {
-            int sum;
-            int smoothingSize = 11; // must be odd
-            int limit = smoothingSize / 2;
-            for (int i = limit; i < p_searchSpace.Length - limit; ++i)
-            {
-                sum = 0;
-                for (int j = -limit; j <= limit; ++j)
-                {
-                    sum += p_searchSpace[i + j];
-                }
-                p_smoothSpace[i] = sum / smoothingSize;
             }
         }
 

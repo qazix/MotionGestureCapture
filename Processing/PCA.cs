@@ -197,46 +197,6 @@ namespace MotionGestureProcessing
         }
 
         /// <summary>
-        /// NOT USED FOR ISSUES IN GESTURES
-        /// 
-        /// this transforms the original data by multiplying the eigenvectors by the mean adjusted data
-        /// The eigenvalues are generally stored in a matrix like so | x1, x2 | and so must be transposed
-        ///                                                          | y1, y2 | 
-        /// However I've already stored it as transposed so that won't happen.  Second the point matrix doesn't exist
-        /// per say, I'll explain the implementation later
-        /// </summary>
-        /// <param name="p_dataPoints">points to transform</param>
-        /// <param name="p_pcaData">holds the eigenvectors</param>
-        private void adjustDatapoints(ref List<Point> p_dataPoints, PCAData p_pcaData)
-        {
-            //Lists are immutable so i need to create a new list in order to work out the transform
-            List<Point> transPoints = new List<Point>();
-
-            double x1, y1, x2, y2;
-            float xbar, ybar;
-            x1 = p_pcaData.eigenVectors[0, 0];
-            y1 = p_pcaData.eigenVectors[0, 1];
-            x2 = p_pcaData.eigenVectors[1, 0];
-            y2 = p_pcaData.eigenVectors[1, 1];
-
-            xbar = p_pcaData.XBar;
-            ybar = p_pcaData.YBar;
-
-            //performs a matrix multiply 
-            foreach (Point point in p_dataPoints)
-            {
-                Point insert = new Point();
-
-                insert.X = (int)(x1 * (point.X - xbar) + y1 * (point.Y - ybar));
-                insert.Y = (int)(x2 * (point.X - xbar) + y2 * (point.Y - ybar));
-
-                transPoints.Add(insert);
-            }
-
-            p_dataPoints = transPoints;
-        }
-
-        /// <summary>
         /// Use the principal component to determine the orientation
         /// The top of the image represents 0 deg
         /// 

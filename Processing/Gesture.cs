@@ -19,9 +19,13 @@ namespace MotionGestureProcessing
         public Gesture()
         { m_thumbPos = 0; }
 
-        public void initialize()
+        public void initialize(int p_handedness = 0)
         {
             setupListener();
+            if (p_handedness > 1 || p_handedness < -1)
+                m_thumbPos = -1;
+            else
+                m_thumbPos = p_handedness;
         }
 
         protected override void setupListener()
